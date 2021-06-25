@@ -1,1 +1,1 @@
-from rangecollection.collection import RangeCollection
+from rangel.collection import RangeCollection
