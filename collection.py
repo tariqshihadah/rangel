@@ -120,6 +120,10 @@ class RangeCollection(object):
         self.set_closed(closed, inplace=True)
         
         # Process ranges
+        if begs is None:
+            begs = []
+        if ends is None:
+            ends = begs
         begs = np.array(begs, dtype=float, copy=copy)
         ends = np.array(ends, dtype=float, copy=copy)
         self._begs = begs.copy()
@@ -155,6 +159,9 @@ centers={self.center_type})"""
         return text
     
     def __repr__(self):
+        # If no ranges present, return self as a string
+        if self.num_ranges == 0:
+            return str(self)
         # Determine numbers of left and right digits to display
         ld = len(str(int(self.arr.max())))
         rd = 3
@@ -708,8 +715,9 @@ RangeCollection instances.")
         if reset_centers:
             rc.reset_centers(inplace=True)
         return rc
-        
-    def random_int(beg_bounds=(0,10), end_bounds=(0,10), size=10,
+    
+    @classmethod
+    def random_int(cls, beg_bounds=(0,10), end_bounds=(0,10), size=10,
                    random_center=False, **kwargs):
         """
         Create a randomly-generated collection of integer ranges based on the 
@@ -742,7 +750,7 @@ RangeCollection instances.")
         ends = np.max([begs_, ends_], axis=0)
         
         # Generate and return the range collection
-        rc = RangeCollection(begs=begs, ends=ends, **kwargs)
+        rc = cls(begs=begs, ends=ends, **kwargs)
         
         # Define centers based on user input
         if random_center:
@@ -750,7 +758,8 @@ RangeCollection instances.")
         
         return rc
     
-    def random_float(beg_bounds=(0,10), end_bounds=(0,10), size=10,
+    @classmethod
+    def random_float(cls, beg_bounds=(0,10), end_bounds=(0,10), size=10,
                      random_center=False, **kwargs):
         """
         Create a randomly-generated collection of float ranges based on the 
@@ -785,15 +794,16 @@ RangeCollection instances.")
         ends = np.max([begs_, ends_], axis=0)
         
         # Generate the range collection
-        rc = RangeCollection(begs=begs, ends=ends, **kwargs)
+        rc = cls(begs=begs, ends=ends, **kwargs)
         
         # Define centers based on user input
         if random_center:
             rc.randomize_centers(inplace=True)
         
         return rc
-        
-    def random_consecutive(beg=0, end=10, size=10, **kwargs):
+    
+    @classmethod
+    def random_consecutive(cls, beg=0, end=10, size=10, **kwargs):
         """
         Create a randomly-generated collection of consecutive float ranges 
         based on the defined parameters.
@@ -812,7 +822,7 @@ RangeCollection instances.")
         breaks = np.concatenate([[beg], breaks])
         
         # Generate and return the range collection
-        return RangeCollection(breaks=breaks, **kwargs)
+        return cls.from_breaks(breaks=breaks, **kwargs)
     
     def reset_keys(self, keys=None, inplace=False):
         """
@@ -1257,11 +1267,11 @@ provided as single numerical values or array-likes of numerical values.")
         # Modify test for specific closed cases
         if self.closed in ['left_mod']:
             # Identify ends of group ranges which will be modified
-            mod_locs = self.are_consecutive(all_=False, when_one=False)
+            mod_locs = self.are_consecutive(all_=False, when_one=np.array([], dtype=bool))
             mod_locs = np.append(~mod_locs, True)
         elif self.closed in ['right_mod']:
             # Identify ends of group ranges which will be modified
-            mod_locs = self.are_consecutive(all_=False, when_one=False)
+            mod_locs = self.are_consecutive(all_=False, when_one=np.array([], dtype=bool))
             mod_locs = np.append(True, ~mod_locs)
         else:
             mod_locs = np.zeros(self.begs.shape, dtype=bool)
@@ -1869,8 +1879,8 @@ value or must be list of same length as 'by'.")
             self._monotonic = True
             return
         else:
-            rc = RangeCollection(begs, ends, self._centers, copy=True,
-                                 force_monotonic=False)
+            rc = self.__class__(begs, ends, self._centers, copy=True,
+                                force_monotonic=False)
             rc._monotonic = True
             return rc
         
@@ -2250,7 +2260,7 @@ number of scores equal to the number of ranges in the collection.")
             self.reset_keys()
             return
         else:
-            return RangeCollection(begs=begs, ends=ends, closed=self.closed)
+            return self.__class__(begs=begs, ends=ends, closed=self.closed)
         
     def simplify(self, inplace=False, **kwargs):
         """
@@ -2349,8 +2359,8 @@ number of scores equal to the number of ranges in the collection.")
             self.reset_keys(inplace=True)
         else:
             # Create newly pixelated range collection
-            rc = RangeCollection(begs=begs_all, ends=ends_all, centers=None, 
-                                 closed=self.closed, **kwargs)
+            rc = self.__class__(begs=begs_all, ends=ends_all, centers=None, 
+                                closed=self.closed, **kwargs)
             if return_keys:
                 return rc, ref_keys
             else:
