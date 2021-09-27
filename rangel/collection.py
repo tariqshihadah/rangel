@@ -88,11 +88,11 @@ class RangeCollection(object):
         left : ranges are always closed on the left and never closed on the 
             right.
         left_mod : ranges are always closed on the left and only closed on the 
-            right when the next range is not consecutive.
+            right when the next range is not consecutive or overlapping.
         right : ranges are always closed on the right and never closed on the 
             right.
         right_mod : ranges are always closed on the right and only closed on 
-            the left when the previous range is not consecutive.
+            the left when the previous range is not consecutive or overlapping.
         both : ranges are always closed on both sides
         neither : ranges are never closed on either side
             
@@ -1267,11 +1267,11 @@ provided as single numerical values or array-likes of numerical values.")
         # Modify test for specific closed cases
         if self.closed in ['left_mod']:
             # Identify ends of group ranges which will be modified
-            mod_locs = self.are_consecutive(all_=False, when_one=np.array([], dtype=bool))
+            mod_locs = self.are_overlapping(all_=False, when_one=np.array([], dtype=bool), enforce_edges=True)
             mod_locs = np.append(~mod_locs, True)
         elif self.closed in ['right_mod']:
             # Identify ends of group ranges which will be modified
-            mod_locs = self.are_consecutive(all_=False, when_one=np.array([], dtype=bool))
+            mod_locs = self.are_overlapping(all_=False, when_one=np.array([], dtype=bool), enforce_edges=True)
             mod_locs = np.append(True, ~mod_locs)
         else:
             mod_locs = np.zeros(self.begs.shape, dtype=bool)
@@ -1376,7 +1376,8 @@ provided as single numerical values or array-likes of numerical values.")
             end = beg
         return (self.begs == beg) & (self.ends == end)
     
-    def are_overlapping(self, all_=True, enforce_edges=False, **kwargs):
+    def are_overlapping(self, all_=True, when_one=True, sort=False, 
+            enforce_edges=False, **kwargs):
         """
         Whether all or any ranges are overlapping the next range in the 
         collection.
@@ -1389,19 +1390,21 @@ provided as single numerical values or array-likes of numerical values.")
             overlapping, False if any adjacent ranges are not overlapping. If 
             False, will return an array of shape num_ranges - 1 of boolean 
             values indicating whether each range is overlapping the next.
+        when_one : bool, default True
+            The default boolean value to return when only one range is included 
+            in the collection.
         enforce_edges : bool, default False
-            Whether or not to consider ranges which have a common vertex as 
-            overlapping when both sides are closed.
+            Whether to consider ranges which have a common vertex as 
+            overlapping. This is independent of the collection's closed state.
         """
-        # Sort ranges
-        rc = self.copy()
-        rc, inv = rc.sortranges(by=['begs', 'lengths'],
-                                ascending=[True, True],
-                                inplace=False,
-                                return_inverse=True)
-        
+        # Validate input
+        if self.num_ranges == 1:
+            return when_one
+        elif self.num_ranges == 0:
+            raise ValueError("No ranges in collection.")
+
         # Check for overlapping
-        if enforce_edges and self.closed == 'both':
+        if enforce_edges:
             res = (self.begs[1:] <= self.ends[:-1])
         else:
             res = (self.begs[1:] < self.ends[:-1])
@@ -1410,7 +1413,7 @@ provided as single numerical values or array-likes of numerical values.")
         else:
             return res
     
-    def are_consecutive(self, all_=True, when_one=True):
+    def are_consecutive(self, all_=True, when_one=True, sort=False):
         """
         Whether all or any ranges are consecutive with the next range in the 
         collection.
@@ -1432,18 +1435,38 @@ provided as single numerical values or array-likes of numerical values.")
             return when_one
         elif self.num_ranges == 0:
             raise ValueError("No ranges in collection.")
-            
+        
+        # Check for consecutive ranges
         res = (self.begs[1:] == self.ends[:-1])
         if all_:
             return res.all()
         else:
             return res
     
-    def are_monotonic(self, all_=True):
+    def are_monotonic(self, all_=True, when_one=True):
         """
-        Whether all ranges are increasing.
+        Whether all ranges are increasing (i.e., self.begs >= self.ends).
+
+        Parameters
+        ----------
+        all_ : bool, default True
+            Whether to aggregate all tests of monotonic ranges, returning a 
+            single boolean value. If True, will return True if all ranges are 
+            monotonic, False if any adjacent ranges are not monotonic. If 
+            False, will return an array of shape num_ranges of boolean values 
+            indicating whether each range is monotonic or not.
+        when_one : bool, default True
+            The default boolean value to return when only one range is included 
+            in the collection.
         """
-        res = (self.ends >= self.begs).all()
+        # Validate input
+        if self.num_ranges == 1:
+            return when_one
+        elif self.num_ranges == 0:
+            raise ValueError("No ranges in collection.")
+        
+        # Check for monotonic
+        res = (self.ends >= self.begs)
         if all_:
             return res.all()
         else:
