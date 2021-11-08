@@ -1,0 +1,22 @@
+# Import class
+from rangel import RangeCollection
+
+# Create a range collection using an input array
+rc_array = RangeCollection.from_array([[0,1,2,3,10,11,12,13],[5,6,7,8,15,16,17,18]])
+rc_array.plot()
+
+# Create and view a random range collection
+rc_random = RangeCollection.random_float(size=8)
+rc_random.plot()
+
+# Separate ranges
+rc_separated = rc_random.separate(by='true_centers').drop_short()
+rc_separated.plot()
+
+# Create sliding window ranges
+rc_windows = RangeCollection.from_steps(0, 10, length=4, steps=8)
+rc_windows.plot()
+
+# Analyze intersecting ranges
+rc_intersecting = rc_windows[rc_windows.intersecting(beg=5.3, end=5.5, closed='left')]
+rc_intersecting.plot()
