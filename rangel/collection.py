@@ -1180,7 +1180,8 @@ between 0 and {self.num_ranges - 1}.")
         
         return t1
     
-    def intersecting(self, beg=None, end=None, closed=None, **kwargs):
+    def intersecting(self, beg=None, end=None, closed=None, validate=True, 
+                     **kwargs):
         """
         Get boolean mask for ranges which intersect the given range values. If 
         multiple ranges given, return a mask array with a second dimension 
@@ -1198,6 +1199,9 @@ between 0 and {self.num_ranges - 1}.")
                 'neither'}, optional
             Whether intervals are closed on the left-side, right-side, both or 
             neither. If not provided, default to collection property.
+        validate : boolean, default True
+            Whether to validate the input begin and end location information. 
+            Unless externally validated, always use True.
 
         Returns
         -------
@@ -1211,16 +1215,8 @@ between 0 and {self.num_ranges - 1}.")
         self._validate_monotonic()
         
         # Validate input events
-        if beg is None:
-            raise ValueError("No input range(s) provided.")
-        elif end is None:
-            end = beg
-        try:
-            beg = np.asarray(beg, dtype=float).flatten()
-            end = np.asarray(end, dtype=float).flatten()
-        except ValueError:
-            raise ValueError(f"Input begin and end locations must be \
-provided as single numerical values or array-likes of numerical values.")
+        if validate:
+            beg, end = self._validate_beg_end(beg, end)
         
         # Validate closed
         if closed is None:
@@ -1577,12 +1573,13 @@ provided as single numerical values or array-likes of numerical values.")
             beg = np.asarray(beg, dtype=float)
             end = np.asarray(end, dtype=float)
         except ValueError:
-            raise ValueError(f"Input begin and end locations must be \
-provided as single numerical values or array-likes of numerical values.")
+            raise ValueError("Input begin and end locations must be "
+                "provided as single numerical values or array-likes of "
+                "numerical values.")
         # Validate parameters
         if 'minus_gaps' in kwargs:
-            warnings.warn("Use of 'minus_gaps' is deprecated, instead use \
-synonymous 'by_sum'", DeprecationWarning)
+            warnings.warn("Use of 'minus_gaps' is deprecated, instead use "
+                "synonymous 'by_sum'", DeprecationWarning)
             by_sum = kwargs['minus_gaps']
         
         # Compute the overlap lengths
@@ -1612,7 +1609,7 @@ synonymous 'by_sum'", DeprecationWarning)
             return overlap
     
     def overlay(self, beg=None, end=None, normalize=True, how='right', 
-                norm_zero=None, squeeze=True, **kwargs):
+                norm_zero=None, squeeze=True, validate=True, **kwargs):
         """
         Compute overlap of the input bounds with respect to collection ranges.
         
@@ -1645,6 +1642,9 @@ synonymous 'by_sum'", DeprecationWarning)
             Whether to reduce the dimensions of the output array to 1D if only 
             a single begin/end location was provided. If False, output array 
             will always be 2D.
+        validate : boolean, default True
+            Whether to validate the input begin and end location information. 
+            Unless externally validated, always use True.
 
         Modified: 12/21/2020
         """
@@ -1653,17 +1653,8 @@ synonymous 'by_sum'", DeprecationWarning)
         # VALIDATE INPUT #
         #----------------#
         # Validate input events
-        if beg is None:
-            raise ValueError("No input range(s) provided.")
-        elif end is None:
-            end = beg
-        try:
-            beg = np.asarray(beg, dtype=float)
-            end = np.asarray(end, dtype=float)
-        except ValueError:
-            raise ValueError("Input begin and end locations must be "
-                "provided as single numerical values or array-likes of "
-                "numerical values.")
+        if validate:
+            beg, end = self._validate_beg_end(beg, end)
         # Validate normalization parameters
         try:
             how_ops = {'right','left','sum'}
@@ -1713,6 +1704,26 @@ synonymous 'by_sum'", DeprecationWarning)
             return overlap[:,0]
         else:
             return overlap
+
+    def _validate_beg_end(self, beg, end, arr=True):
+        """
+        Validate input begin and end data for use in overlay, intersecting, 
+        and similar methods.
+        """
+        if beg is None:
+            raise ValueError("No input range(s) provided.")
+        elif end is None:
+            end = beg
+        if arr:
+            try:
+                beg = np.asarray(beg, dtype=float).flatten()
+                end = np.asarray(end, dtype=float).flatten()
+            except ValueError:
+                raise ValueError("Input begin and end locations must be "
+                    "provided as single numerical values or array-likes of "
+                    "numerical values.")
+        # Return validate begin and end data
+        return beg, end
     
     def intersect(self, other=None):
         """
@@ -1760,8 +1771,8 @@ synonymous 'by_sum'", DeprecationWarning)
         if type(ascending) is bool:
             ascending = [ascending for x in range(len(by))]
         elif type(ascending) is list and not len(ascending) == len(by):
-            raise ValueError("'ascending' parameter must be single boolean \
-value or must be list of same length as 'by'.")
+            raise ValueError("'ascending' parameter must be single boolean "
+                "value or must be list of same length as 'by'.")
         
         # Get the arrays for lexsort
         ascending = [1 if x else -1 for x in ascending[::-1]] # Reverse order
@@ -1819,9 +1830,11 @@ value or must be list of same length as 'by'.")
         self._validate_monotonic()
         
         # Analyze unique combinations of begin and end points
-        unique, uindex, ucounts = np.unique(self.arr, axis=1, 
-                                            return_index=True,
-                                            return_counts=True)
+        unique, uindex, ucounts = np.unique(
+            self.arr, axis=1, 
+            return_index=True,
+            return_counts=True
+        )
         
         # Ignore the first instance of non-unique ranges
         if not keepfirst:
@@ -1849,9 +1862,11 @@ value or must be list of same length as 'by'.")
         """
         self._validate_monotonic()
         
-        unique, uindex, ucounts = np.unique(self.centers, 
-                                            return_index=True,
-                                            return_counts=True)
+        unique, uindex, ucounts = np.unique(
+            self.centers, 
+            return_index=True,
+            return_counts=True
+        )
                
         # Ignore the first instance of concentric ranges
         if not keepfirst:
@@ -2048,8 +2063,8 @@ value or must be list of same length as 'by'.")
         #----------------#
         # Validate selected reference point information
         if not by in [None, 'centers', 'begs', 'ends', 'true_centers']:
-            raise ValueError("Separate 'by' must be either 'centers', \
-'begs', 'ends', or 'true_centers' or None.")
+            raise ValueError("Separate 'by' must be either 'centers', "
+                "'begs', 'ends', or 'true_centers' or None.")
 
         #--------------------#
         # PREPARE RANGE DATA #
@@ -2058,10 +2073,12 @@ value or must be list of same length as 'by'.")
         rc = self.copy(deep=True)
         if not by is None:
             rc.set_centers(centers=by, inplace=True)
-        rc, inv = rc.sortranges(by=['centers', 'lengths'],
-                                ascending=[True, False],
-                                inplace=False,
-                                return_inverse=True)
+        rc, inv = rc.sortranges(
+            by=['centers', 'lengths'],
+            ascending=[True, False],
+            inplace=False,
+            return_inverse=True
+        )
         
         # Eliminate concentric, same, and inside ranges
         rc = rc.eliminate_concentric(**kwargs).eliminate_same(**kwargs)
@@ -2080,16 +2097,18 @@ value or must be list of same length as 'by'.")
         centers_r = rc.centers[index[1:]].copy()
         
         # Compute midpoints between consecutive centers
-        center_mids = (centers_l + centers_r)/2
+        center_mids = (centers_l + centers_r) / 2
         center_mids_valid = (rights >= center_mids) & (lefts <= center_mids)
         
         # Compute midpoints between consecutive termini
         termini_mids = (rights + lefts)/2
         termini_mids = np.min([np.max([termini_mids, centers_l], axis=0),
                                centers_r], axis=0)
-        termini_mids_valid = ((rights >= termini_mids) &
-                              (lefts <= termini_mids) &
-                              (termini_mids >= centers_l))
+        termini_mids_valid = (
+            (rights >= termini_mids) &
+            (lefts <= termini_mids) &
+            (termini_mids >= centers_l)
+        )
         
         # Apply termini mids
         rights[termini_mids_valid] = termini_mids[termini_mids_valid]
@@ -2114,8 +2133,6 @@ value or must be list of same length as 'by'.")
                 self.drop_short(length=0, inplace=True)
             return
         else:
-            # Restore ranges
-            rc = rc[inv]
             # Drop short if requested
             if drop_short:
                 rc.drop_short(length=0, inplace=True)
@@ -2171,23 +2188,24 @@ value or must be list of same length as 'by'.")
         # Scores provided via 'by' parameter
         if scores is None:
             if by is None:
-                raise ValueError("Must provide either 'scores' or 'by' \
-arguments to perform prioritized separation.")
+                raise ValueError("Must provide either 'scores' or 'by' "
+                    "arguments to perform prioritized separation.")
             try:
                 # Attempt to retrieve the selected property
                 scores = getattr(self, by)
             except AttributeError:
-                raise AttributeError(f"Invalid range collection property \
-provided to the 'by' argument. Must be 'lengths', 'centers', 'begs', 'ends', \
-or similar.")
+                raise AttributeError("Invalid range collection property "
+                    "provided to the 'by' argument. Must be 'lengths', "
+                    "'centers', 'begs', 'ends', or similar.")
 
         # Validate scores information
         try:
             scores = np.asarray(scores, dtype=float).flatten()
             assert scores.size == self.num_ranges
         except:
-            raise TypeError("Provided scores data must be numerical, with a \
-number of scores equal to the number of ranges in the collection.")
+            raise TypeError("Provided scores data must be numerical, with a "
+                "number of scores equal to the number of ranges in the "
+                "collection.")
         # Select ascending or descending
         if not ascending:
             scores = scores * -1
@@ -2406,8 +2424,8 @@ number of scores equal to the number of ranges in the collection.")
         beg = -np.inf if beg is None else beg
         end =  np.inf if end is None else end
         if end < beg:
-            raise ValueError("End point must be greater than or equal to \
-begin point.")
+            raise ValueError("End point must be greater than or equal to "
+                "begin point.")
         
         # Eliminate non-intersecting ranges
         before = self.is_before(loc=beg, closed='both')
@@ -2555,13 +2573,13 @@ centers, or true_centers (mid), or an array of anchor values.")
 
     def shift(self, shift, inplace=False, **kwargs):
         """
-        Shift all ranges in the collection be a single numeric value amount or 
+        Shift all ranges in the collection by a single numeric value amount or 
         based on a provided 1D numpy array whose length is equal to the number 
         of ranges in the collection.
 
         Parameters
         ----------
-        shift : int or np.ndarray
+        shift : scalar or np.ndarray of scalars
             Numeric distance to shift all ranges in the collection by. Can be 
             provided as a single numeric value or a 1D numpy array whose 
             length is equal to RangeCollection.num_ranges.
@@ -2596,6 +2614,61 @@ equal to the number of ranges in the collection.")
         else:
             rc = self.copy(deep=True)
             rc.shift(shift=shift, inplace=True)
+            return rc
+
+    def extend(self, length, direction='right', inplace=False, **kwargs):
+        """
+        Extend all ranges in the collection by a single numeric value amount or 
+        based on a provided 1D numpy array whose length is equal to the number 
+        of ranges in the collection. Extension can be made to the left, right, 
+        or both directions using the direction parameter.
+
+        Parameters
+        ----------
+        length : scalar or np.ndarray of scalars
+            Numeric distance to extend all ranges in the collection by. Can be 
+            provided as a single numeric value or a 1D numpy array whose 
+            length is equal to RangeCollection.num_ranges.
+        direction : {'right', 'left', 'both'}, default 'right'
+            The direction in which to extend existing ranges by the input 
+            length parameter. If both, ranges will be extended by the whole  
+            input length in both directions.
+        inplace : boolean, default False
+            Whether to perform the operation in place on the parent range
+            collection, returning None.
+        
+        Returns
+        -------
+        res : RangeCollection
+            The resulting RangeCollection object with all ranges extended by 
+            the input amount.
+        """
+        # Validate input shift variable
+        error = ValueError("Extend value must be provided as a single "
+                    "numeric value or a 1D array of numeric values with a "
+                    "number of elements equal to the number of ranges in the "
+                    "collection.")
+        try:
+            length = np.asarray(length).flatten()
+        except:
+            raise error
+        if not length.size in [1, self.num_ranges]:
+            raise error
+        direction_ops = {'left','right','both'}
+        if not direction in direction_ops:
+            raise ValueError("Direction parameter must be one of "
+                f"{direction_ops}")
+        
+        # Apply extension
+        if inplace:
+            if direction in ['left','both']:
+                self._begs -= length
+            if direction in ['right','both']:
+                self._ends += length
+            return
+        else:
+            rc = self.copy(deep=True)
+            rc.extend(length=length, direction=direction, inplace=True)
             return rc
 
     # Address deprecation and naming
