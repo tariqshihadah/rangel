@@ -616,6 +616,26 @@ as a single scalar value or an array-like of scalar values.")
             right : the final range will be anchored on the grid defined by the 
                 step value, extending the full range length to the right, 
                 beyond the defined end value.
+
+            Schematics
+            ----------
+            bounds : [------------------------]
+            none :   
+                     [---------|              ]
+                     [         |---------|    ]
+            cut : 
+                     [---------|              ]
+                     [         |---------|    ]
+                     [                   |----]
+            left :   
+                     [---------|              ]
+                     [         |---------|    ]
+                     [              |---------]
+            right :  
+                     [---------|              ]
+                     [         |---------|    ]
+                     [                   |----]----|
+
         **kwargs
             Keyword arguments used for initialization of the RangeCollection 
             class instance.
@@ -679,11 +699,62 @@ as a single scalar value or an array-like of scalar values.")
         # Generate RangeCollection
         rc = cls(begs=begs, ends=ends, **kwargs)
         return rc
+
+    @classmethod
+    def merge(cls, objs, fill_gaps=False, return_index=False, **kwargs):
+        """
+        Combine multiple RangeCollection instances into a single instance, 
+        creating least common intervals among all collections. If requested, 
+        a list of index arrays for each range can be provided to relate each 
+        new range to its parent range(s).
+
+        Parameters
+        ----------
+        objs : list-like of RangeCollection instances
+            A selection of RangeCollection object instances to be combined 
+            into a single instance based on the input parameters.
+        fill_gaps : bool, default False
+            Whether to fill gaps in merged collection with ranges. These ranges 
+            would not be associated with any parent collection.
+        return_index : bool, default False
+            Whether to return a list of index arrays for each collection which 
+            relates each new range to its parent range(s) within the collection 
+            with a range index.
+        **kwargs
+            Keyword arguments to be passed to the initialization function for 
+            the new RangeCollection instance.
+        """
+        # Validate input
+        for obj in objs:
+            if not isinstance(obj, cls):
+                raise TypeError("Input objects must be list-like of \
+RangeCollection instances.")
+
+        if not fill_gaps:
+            raise NotImplementedError()
+
+        # Create range collection from all unique range begin and end values
+        unique = np.unique(np.concatenate([obj.rng for obj in objs], axis=1))
+        rc = RangeCollection.from_breaks(unique, **kwargs)
+        
+        # If requested, return indices for each original range
+        if return_index:
+            indices = []
+            for obj in objs:
+                # Intersect all parent collection ranges with new collection
+                mask = rc.intersecting(obj.begs, obj.ends, closed='neither')
+                # Determine parent range; if none, return an index of np.nan
+                argmax = mask.argmax(axis=1)
+                indices.append(np.where(mask.max(axis=1), argmax, np.nan))
+        
+        # Return result
+        return (rc, indices) if return_index else rc
     
     @classmethod
     def concatenate(cls, objs=[], reset_centers=True, sort=True, **kwargs):
         """
-        Combine multiple RangeCollection instances into a single instance.
+        Concatenate multiple RangeCollection instances into a single instance 
+        without modifying each collection's range data.
         
         Parameters
         ----------
@@ -1654,24 +1725,6 @@ between 0 and {self.num_ranges - 1}.")
                     "numerical values.")
         # Return validate begin and end data
         return beg, end
-    
-    def intersect(self, other=None):
-        """
-        NOT YET IMPLEMENTED
-
-        Intersect another range collection with this one, producing a single 
-        range collection with no overlaps. If no other range collection is 
-        provided, the collection will intersect with itself. This may be 
-        useful for collections with some overlapping ranges.
-        
-        Parameters
-        ----------
-        other : RangeCollection, optional
-            Another range collection to intersect with the current instance. 
-            If none is provided, the current range collection will intersect 
-            with itself.
-        """
-        raise Exception("Not yet implemented")
     
     def sortranges(self, by='begs', ascending=True, return_index=False, 
                    return_inverse=False, inplace=False):
