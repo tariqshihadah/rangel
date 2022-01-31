@@ -1252,7 +1252,7 @@ between 0 and {self.num_ranges - 1}.")
         return t1
     
     def intersecting(self, beg=None, end=None, closed=None, validate=True, 
-                     **kwargs):
+                     squeeze=True, **kwargs):
         """
         Get boolean mask for ranges which intersect the given range values. If 
         multiple ranges given, return a mask array with a second dimension 
@@ -1273,6 +1273,10 @@ between 0 and {self.num_ranges - 1}.")
         validate : boolean, default True
             Whether to validate the input begin and end location information. 
             Unless externally validated, always use True.
+        squeeze : boolean, default True
+            Whether to reduce the dimensions of the output array to 1D if only 
+            a single begin/end location was provided. If False, output array 
+            will always be 2D.
 
         Returns
         -------
@@ -1317,9 +1321,9 @@ between 0 and {self.num_ranges - 1}.")
             t1[mod_locs,:] = \
                 np.less_equal(rbegs[mod_locs,:], end.reshape(1,-1))
         
-        # Combine test results
+        # Combine test results and squeeze if requested
         res = t1 & t2
-        if res.shape[1] == 1:
+        if res.shape[1] == 1 and squeeze:
             res = res.flatten()
 
         # Return final test results
