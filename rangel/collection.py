@@ -99,6 +99,10 @@ class RangeCollection(object):
     sort : boolean, default True
         Whether to automatically sort the ranges by begin points or to leave
         them in the order they are input.
+    snap_centers : boolean, default False
+        Whether to snap center values which fall outside the bounds of an 
+        associated range to the nearest bound. Only applicable when an array 
+        of center values is provided.
     copy : boolean, default True
         Whether to copy all input information to the range collection.
     force_monotonic : boolean, default True
@@ -112,9 +116,9 @@ class RangeCollection(object):
     _ops_closed = {'left','left_mod','right','right_mod','both','neither'}
     _ops_centers = {'true_centers','begs','ends'}
     
-    def __init__(self, begs=None, ends=None, centers=None, 
-                 closed='right', sort=True, copy=True,
-                 force_monotonic=True, keys=None):
+    def __init__(
+        self, begs=None, ends=None, centers=None, closed='right', sort=True, 
+        snap_centers=False, copy=True, force_monotonic=True, keys=None):
 
         # Establish closed parameters
         self.set_closed(closed, inplace=True)
@@ -128,7 +132,7 @@ class RangeCollection(object):
         ends = np.array(ends, dtype=float, copy=copy)
         self._begs = begs.copy()
         self._ends = ends.copy()
-        self.set_centers(centers, inplace=True, copy=copy)
+        self.set_centers(centers, inplace=True, snap=snap_centers, copy=copy)
     
         # Reset keys
         self.reset_keys(keys=keys, inplace=True) 
@@ -347,7 +351,7 @@ provided as a list of arrays or array-like.")
         if self.center_type=='data':
             self._centers = self._centers[index]
         
-    def _validate_centers(self, centers=None, copy=False):
+    def _validate_centers(self, centers=None, snap=False, copy=False):
         """
         Ensure that each range center falls within the bounds of
         its respective range.
@@ -360,8 +364,8 @@ provided as a list of arrays or array-like.")
         elif isinstance(centers, str):
             # Check for valid value
             if not centers in self._ops_centers:
-                raise ValueError(f"Centers as string must be one of \
-{self._ops_centers}.")
+                raise ValueError(
+                    f"Centers as string must be one of {self._ops_centers}.")
             return centers
 
         # Validate array input
@@ -373,8 +377,9 @@ provided as a list of arrays or array-like.")
 
         # Test for array length
         if len(centers) != self.num_ranges:
-            raise ValueError("Centers information must have an equal \
-number of elements to the number of ranges in the collection.")
+            raise ValueError(
+                "Centers information must have an equal number of elements to "
+                "the number of ranges in the collection.")
         
         # Test for numeric dtype
         if not np.issubdtype(centers.dtype, np.number):
@@ -385,9 +390,14 @@ number of elements to the number of ranges in the collection.")
             raise ValueError("Input center values cannot contain NaN.")
 
         # Test the centers against the bounds of the ranges
-        if not np.all((centers >= self.begs) & (centers <= self.ends)):
-            raise ValueError("Range centers must fall within the begin and \
-end points of the input ranges.")
+        if snap:
+            # Snap values to nearest bound
+            centers = np.max([centers, self.begs], axis=0)
+            centers = np.min([centers, self.ends], axis=0)
+        elif not np.all((centers >= self.begs) & (centers <= self.ends)):
+            raise ValueError(
+                "Range centers must fall within the begin and end points of "
+                "the input ranges.")
 
         # Return validated centers array
         return centers
@@ -616,6 +626,9 @@ as a single scalar value or an array-like of scalar values.")
             right : the final range will be anchored on the grid defined by the 
                 step value, extending the full range length to the right, 
                 beyond the defined end value.
+            extend : the final range will be anchored on the grid defined by 
+                the step value, extending beyond the step length to the right
+                bound of the range.
 
             Schematics
             ----------
@@ -635,6 +648,9 @@ as a single scalar value or an array-like of scalar values.")
                      [---------|              ]
                      [         |---------|    ]
                      [                   |----]----|
+            extend :
+                     [---------|              ]
+                     [         |--------------]
 
         **kwargs
             Keyword arguments used for initialization of the RangeCollection 
@@ -659,7 +675,7 @@ as a single scalar value or an array-like of scalar values.")
         except ValueError:
             raise TypeError("Number of steps must be an integer value.")
         # - fill
-        fill_options = {'none','cut','left','right'}
+        fill_options = {'none','cut','left','right','extend'}
         if fill is None:
             fill = 'cut'
         elif not fill in fill_options:
@@ -692,6 +708,14 @@ as a single scalar value or an array-like of scalar values.")
             elif fill == 'right':
                 begs = np.append(begs,last_beg+step)
                 ends = np.append(ends,last_end+step)
+            elif fill == 'extend':
+                if num_ranges > 0:
+                    ends[-1] = end
+                elif end > beg:
+                    begs = np.array([beg])
+                    ends = np.array([end])
+                else:
+                    pass
         else:
             begs = np.append(begs,last_beg+step)
             ends = np.append(ends,end)
@@ -967,7 +991,7 @@ number of ranges in the collection.")
             raise ValueError(f"Closed parameter must be one of \
 {self._ops_closed}.")
     
-    def set_centers(self, centers=None, inplace=False, copy=True):
+    def set_centers(self, centers=None, snap=False, inplace=False, copy=True):
         """
         Change the set range center information.
         
@@ -980,9 +1004,12 @@ number of ranges in the collection.")
             property to set as the static center values. If None is provided,
             the collection will default to dynamically calculated true center
             values.
+        snap : boolean, default False
+            Whether to snap center values which fall outside the bounds of 
+            an associated range to the nearest bound.
         """
         # Validate input
-        centers = self._validate_centers(centers=centers, copy=copy)
+        centers = self._validate_centers(centers=centers, snap=snap, copy=copy)
         
         # Set the new centers information
         if inplace:
@@ -1134,8 +1161,8 @@ of ranges in the collection.")
         # Check for at least one range
         if len(index) == 0:
             if snap is None:
-                raise ValueError(f"Location ({loc}) does not fall within any \
-valid ranges.")
+                raise ValueError(
+                    f"Location ({loc}) does not fall within any valid ranges.")
             
             # Find the nearest match if requested
             #  - Analyze gaps
@@ -1182,8 +1209,8 @@ valid ranges.")
             elif choose == 'all':
                 return (index, position) + dist
             else:
-                raise ValueError("Choose parameter must be 'first', 'last', \
-or 'all'.")
+                raise ValueError(
+                    "Choose parameter must be 'first', 'last', or 'all'.")
     
     def project(self, index, dist):
         """
@@ -1250,6 +1277,27 @@ between 0 and {self.num_ranges - 1}.")
             t1 = self.ends >= loc
         
         return t1
+
+    def snap(self, loc, **kwargs):
+        """
+        Snap a provided location value to fall within the bounds of a range 
+        within the collection. If the location falls within the bounds of at 
+        least one range, the value will be returned unchanged.
+
+        Note: the process assumes ranges are closed on both sides.
+
+        Parameters
+        ----------
+        loc : scalar
+            Location value to snap to a range.
+        """
+        # Check if already intersecting
+        if self.intersecting(beg=loc, closed='both').any():
+            return loc
+        else:
+            # Snap to bounds
+            bounds = self.pairs.flatten()
+            return bounds[np.abs(bounds - loc).argmin()]
     
     def intersecting(self, beg=None, end=None, closed=None, validate=True, 
                      squeeze=True, **kwargs):
@@ -2473,14 +2521,16 @@ between 0 and {self.num_ranges - 1}.")
             try:
                 anchor = np.asarray(anchor, float).flatten()
             except:
-                raise ValueError("Anchor data must be array-like of scalar \
-values.")
+                raise ValueError("Anchor data must be array-like of scalar "
+                                 "values.")
             if not anchor.size == self.num_ranges:
-                raise ValueError("Array of anchor values must have length \
-equal to the number of ranges in the collection.")
+                raise ValueError("Array of anchor values must have length "
+                                 "equal to the number of ranges in the "
+                                 "collection.")
             if not (anchor >= self.begs) & (anchor <= self.ends):
-                raise ValueError("All anchor values must fall within the \
-begin and end points of each respective range.")
+                raise ValueError("All anchor values must fall within the "
+                                 "begin and end points of each respective "
+                                 "range.")
             lefts  = np.max([self.begs, anchor-(length/2)], axis=0)
             rights = np.min([self.ends, anchor+(length/2)], axis=0)
 
@@ -2506,8 +2556,9 @@ begin and end points of each respective range.")
 
         #  - Invalid anchor inputs
         else:
-            raise ValueError("Anchor must be begs (left), ends (right), \
-centers, or true_centers (mid), or an array of anchor values.")
+            raise ValueError("Anchor must be begs (left), ends (right), "
+                             "centers, or true_centers (mid), or an array of "
+                             "anchor values.")
         
         if inplace:
             self.reset_centers(inplace=True)
@@ -2662,3 +2713,68 @@ equal to the number of ranges in the collection.")
     # - name changed for consistency and due to improved scope
     is_intersecting = intersecting
 
+    def fill(self, direction='both', bounds=None, reset_centers=True, 
+             inplace=False, **kwargs):
+        """
+        """
+        # Validate parameters
+        direction_ops = {'right','left','both'}
+        if not direction in direction_ops:
+            raise ValueError(f"Fill direction must be one of {direction_ops}.")
+        if not bounds is None:
+            try:
+                bound_left = bounds[0]
+                bound_right = bounds[1]
+            except:
+                raise ValueError("If provided, fill bounds must be a two-value "
+                                 "tuple of scalars indicating minimum and "
+                                 "maximum values to extend ranges to.")
+        else:
+            bound_left = bound_right = None
+
+        # Prepare sorted ranges for processing
+        rc = self.copy(deep=True)
+        rc, inv = rc.sortranges(
+            by=['centers', 'lengths'],
+            ascending=[True, False],
+            inplace=False,
+            return_inverse=True
+        )
+        # Compute extensions
+        begs_r = rc.begs[1:]
+        ends_l = rc.ends[:-1]
+        gap_locs = begs_r > ends_l
+        if direction in ['left']:
+            begs_r[gap_locs] = ends_l[gap_locs]
+        elif direction in ['right']:
+            ends_l[gap_locs] = begs_r[gap_locs]
+        elif direction in ['both']:
+            begs_r[gap_locs] = \
+                ends_l[gap_locs] = ((begs_r + ends_l) / 2)[gap_locs]
+        
+        # Compute bounds
+        if not bound_left is None:
+            bound_left = min(bound_left, rc.begs[0])
+        else:
+            bound_left = rc.begs[0]
+        if not bound_right is None:
+            bound_right = max(bound_right, rc.ends[-1])
+        else:
+            bound_right = rc.ends[-1]
+        begs = np.append(bound_left, begs_r)
+        ends = np.append(ends_l, bound_right)
+
+        # Assign the new begin and end points to the processed ranges
+        rc._begs = begs
+        rc._ends = ends
+        rc = rc[inv]
+        if reset_centers:
+            rc.reset_centers(inplace=True)
+
+        if inplace:
+            self._begs = rc._begs
+            self._ends = rc._ends
+            self.set_centers(rc.centers, inplace=True)
+            return
+        else:
+            return rc
