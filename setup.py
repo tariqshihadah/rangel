@@ -2,9 +2,27 @@ from setuptools import setup, find_packages
 import codecs
 import os
 
-VERSION = '0.0.3'
+VERSION = '0.0.4'
 DESCRIPTION = 'Range data manipulations and operations'
-LONG_DESCRIPTION = 'Module featuring RangeCollection object class for the management of range data and optimized performance of various simple and complex range operations, including range and point overlays, equitable and score-based separation of overlapping ranges, generation of random range data, and range data comparisons among others.'
+LONG_DESCRIPTION = """Module featuring RangeCollection object class for the management of range data and optimized performance of various simple and complex range operations, including range and point overlays, equitable and score-based separation of overlapping ranges, generation of random range data, and range data comparisons among others.
+
+Release Notes
+-------------
+0.0.4
+- Added snapping to set_centers and __init__ methods
+- Added squeeze parameter to intersecting method
+- Various bug fixes, performance improvements
+
+0.0.3
+- Initial updated merging features
+- Various bug fixes, performance improvements
+
+0.0.2
+- Various bug fixes, performance improvements
+
+0.0.1
+- Initial release
+"""
 
 # Setting up
 setup(
