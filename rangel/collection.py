@@ -725,7 +725,7 @@ as a single scalar value or an array-like of scalar values.")
         return rc
 
     @classmethod
-    def merge(cls, objs, fill_gaps=False, return_index=False, **kwargs):
+    def union(cls, objs, fill_gaps=False, return_index=False, **kwargs):
         """
         Combine multiple RangeCollection instances into a single instance, 
         creating least common intervals among all collections. If requested, 
@@ -751,26 +751,33 @@ as a single scalar value or an array-like of scalar values.")
         # Validate input
         for obj in objs:
             if not isinstance(obj, cls):
-                raise TypeError("Input objects must be list-like of \
-RangeCollection instances.")
-
-        if not fill_gaps:
-            raise NotImplementedError()
+                raise TypeError(
+                    "Input objects must be list-like of RangeCollection "
+                    "instances.")
 
         # Create range collection from all unique range begin and end values
         unique = np.unique(np.concatenate([obj.rng for obj in objs], axis=1))
         rc = RangeCollection.from_breaks(unique, **kwargs)
         
         # If requested, return indices for each original range
-        if return_index:
+        if return_index or not fill_gaps:
+            masks = []
             indices = []
             for obj in objs:
                 # Intersect all parent collection ranges with new collection
-                mask = rc.intersecting(obj.begs, obj.ends, closed='neither')
+                mask = rc.intersecting(
+                    obj.begs, obj.ends, closed='neither', squeeze=False)
+                masks.append(mask.any(axis=1))
                 # Determine parent range; if none, return an index of np.nan
                 argmax = mask.argmax(axis=1)
                 indices.append(np.where(mask.max(axis=1), argmax, np.nan))
         
+        # Remove gaps if requested
+        if not fill_gaps:
+            select = np.any(masks, axis=0)
+            rc = rc[select]
+            indices = [index[select] for index in indices]
+
         # Return result
         return (rc, indices) if return_index else rc
     
