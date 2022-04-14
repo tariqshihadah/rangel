@@ -312,6 +312,13 @@ centers={self.center_type})"""
         Take an array of break points or a list of arrays of break points and 
         convert them to begin and end points to define unique ranges.
         """
+        # Check for valid input
+        if not isinstance(breaks, (list, np.ndarray)):
+            raise TypeError(
+                "Input breaks must be an array or a list of arrays.")
+        elif len(breaks) == 0:
+            return np.array([]), np.array([])
+
         # Array of numerical break points
         if np.issubdtype(type(breaks[0]), np.number):
             breaks = np.asarray(breaks, dtype=float)
@@ -330,8 +337,9 @@ centers={self.center_type})"""
                     begs = np.concatenate((begs, breaks_i[:-1]), axis=None)
                     ends = np.concatenate((ends, breaks_i[1:]), axis=None)
                 else:
-                    raise TypeError("Multiple sets of break points must be \
-provided as a list of arrays or array-like.")
+                    raise TypeError(
+                        "Multiple sets of break points must be provided as a "
+                        "list of arrays or array-like.")
         
         # Return results as a tuple
         return begs, ends        
