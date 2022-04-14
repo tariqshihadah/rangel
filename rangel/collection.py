@@ -315,7 +315,8 @@ centers={self.center_type})"""
         # Check for valid input
         if not isinstance(breaks, (list, np.ndarray)):
             raise TypeError(
-                "Input breaks must be an array or a list of arrays.")
+                "Input breaks must be an array or a list of arrays of valid "
+                "breaks data.")
         elif len(breaks) == 0:
             return np.array([]), np.array([])
 
@@ -326,12 +327,14 @@ centers={self.center_type})"""
             ends = breaks[1:]
             
         # List of arrays of numerical break points
-        else:
+        elif isinstance(breaks[0], (list, np.ndarray)):
             # Initialize result arrays
             begs = np.asarray([], dtype=float)
             ends = np.asarray([], dtype=float)
             for breaks_i in breaks:
                 # Array of numerical break points
+                if len(breaks_i) == 0:
+                    continue
                 if np.issubdtype(type(breaks_i[0]), np.number):
                     breaks_i = np.asarray(breaks_i, dtype=float)
                     begs = np.concatenate((begs, breaks_i[:-1]), axis=None)
@@ -340,6 +343,10 @@ centers={self.center_type})"""
                     raise TypeError(
                         "Multiple sets of break points must be provided as a "
                         "list of arrays or array-like.")
+        else:
+            raise TypeError(
+                "Input breaks must be an array or a list of arrays of valid "
+                "breaks data.")
         
         # Return results as a tuple
         return begs, ends        
