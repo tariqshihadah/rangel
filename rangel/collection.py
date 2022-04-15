@@ -740,7 +740,8 @@ as a single scalar value or an array-like of scalar values.")
         return rc
 
     @classmethod
-    def union(cls, objs, fill_gaps=False, return_index=False, **kwargs):
+    def union(cls, objs, fill_gaps=False, return_index=False, null_index=None, 
+        **kwargs):
         """
         Combine multiple RangeCollection instances into a single instance, 
         creating least common intervals among all collections. If requested, 
@@ -759,10 +760,19 @@ as a single scalar value or an array-like of scalar values.")
             Whether to return a list of index arrays for each collection which 
             relates each new range to its parent range(s) within the collection 
             with a range index.
+        null_index : int, optional
+            Value to use in returned indices for new ranges which do not 
+            intersect with a provided collection. If not provided, will use 
+            np.nan.
         **kwargs
             Keyword arguments to be passed to the initialization function for 
             the new RangeCollection instance.
         """
+        # Validate null index
+        if null_index is None:
+            null_index = np.nan
+        elif not isinstance(null_index, int):
+            raise ValueError("If provided, null_index must be an integer.")
         # Validate input
         for obj in objs:
             if not isinstance(obj, cls):
@@ -783,9 +793,14 @@ as a single scalar value or an array-like of scalar values.")
                 mask = rc.intersecting(
                     obj.begs, obj.ends, closed='neither', squeeze=False)
                 masks.append(mask.any(axis=1))
-                # Determine parent range; if none, return an index of np.nan
-                argmax = mask.argmax(axis=1)
-                indices.append(np.where(mask.max(axis=1), argmax, np.nan))
+                # Determine parent range; if none, return an index of 
+                # null_index
+                if mask.size == 0:
+                    indices.append(np.full(rc.num_ranges, null_index))
+                else:
+                    argmax = mask.argmax(axis=1)
+                    indices.append(
+                        np.where(mask.max(axis=1), argmax, null_index))
         
         # Remove gaps if requested
         if not fill_gaps:
