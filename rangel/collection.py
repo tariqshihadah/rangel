@@ -849,7 +849,7 @@ RangeCollection instances.")
         return rc
     
     @classmethod
-    def random_int(cls, beg_bounds=(0,10), end_bounds=(0,10), size=10,
+    def random_int(cls, size=10, beg_bounds=(0,10), end_bounds=(0,10), 
                    random_center=False, **kwargs):
         """
         Create a randomly-generated collection of integer ranges based on the 
@@ -857,11 +857,11 @@ RangeCollection instances.")
 
         Parameters
         ----------
+        size : int, default 10
+            The number of ranges to be generated for the collection.
         beg_bounds, end_bounds : tuple, default (0,10)
             Two-element tuples of min and max begin and end values to use when 
             generating the collection.
-        size : int, default 10
-            The number of ranges to be generated for the collection.
         random_center : bool, default False
             Whether to generate random center values for the generated 
             collection. If False, true_centers will be used.
@@ -891,7 +891,7 @@ RangeCollection instances.")
         return rc
     
     @classmethod
-    def random_float(cls, beg_bounds=(0,10), end_bounds=(0,10), size=10,
+    def random_float(cls, size=10, beg_bounds=(0,10), end_bounds=(0,10), 
                      random_center=False, **kwargs):
         """
         Create a randomly-generated collection of float ranges based on the 
@@ -899,11 +899,11 @@ RangeCollection instances.")
 
         Parameters
         ----------
+        size : int, default 10
+            The number of ranges to be generated for the collection.
         beg_bounds, end_bounds : tuple, default (0,10)
             Two-element tuples of min and max begin and end values to use when 
             generating the collection.
-        size : int, default 10
-            The number of ranges to be generated for the collection.
         random_center : bool, default False
             Whether to generate random center values for the generated 
             collection. If False, true_centers will be used.
@@ -935,18 +935,18 @@ RangeCollection instances.")
         return rc
     
     @classmethod
-    def random_consecutive(cls, beg=0, end=10, size=10, **kwargs):
+    def random_consecutive(cls, size=10, beg=0, end=10, **kwargs):
         """
         Create a randomly-generated collection of consecutive float ranges 
         based on the defined parameters.
 
         Parameters
         ----------
+        size : int, default 10
+            The number of ranges to be generated for the collection.
         beg, end : scalar, default 0, 10
             Begin and end points to define the collection of consecutive ranges 
             being generated.
-        size : int, default 10
-            The number of ranges to be generated for the collection.
         """
         # Define breaks
         breaks = np.random.random(size=size)
