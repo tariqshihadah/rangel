@@ -2822,3 +2822,51 @@ equal to the number of ranges in the collection.")
             return
         else:
             return rc
+
+    def cluster(self, buffer=None, closed=None):
+        """
+        Identify clusters of ranges which overlap, returning an array of 
+        cluster indices. Returned indices will include a single value for each 
+        range, associating it with a unique cluster whose ID reflects the 
+        numerical index of the first range within the cluster. The process 
+        allows for chaining, grouping ranges which share an overlapped range 
+        but which do not themselves overlap.
+
+        Parameters
+        ----------
+        buffer : scalar, optional
+            A numerical buffer to be applied to ranges before checking for 
+            overlaps.
+        closed : str {'left', 'left_mod', 'right', 'right_mod', 'both', 
+                'neither'}, default 'right'
+            Whether intervals are closed on the left-side, right-side, both or 
+            neither.
+        """
+        # Buffer self if requested
+        if not buffer is None:
+            rc = self.extend(buffer, direction='both', inplace=False)
+        else:
+            rc = self
+        # Initialize cluster indices data
+        default_clusters = np.arange(rc.num_ranges)
+        clusters = default_clusters.copy()
+        # Identify intersecting ranges
+        intersecting = rc.intersecting(
+            rc.begs, rc.ends, validate=False, squeeze=False, closed=closed)
+        # Cull duplicates
+        intersecting[np.tril_indices(rc.num_ranges, -1)] = False
+        # Identify intersecting clusters
+        for i, adjacent in enumerate(intersecting):
+            # Find points near the indexed point
+            adjacent_idx = clusters[adjacent]
+            # Find the lowest cluster number among points
+            min_idx  = adjacent_idx.min()
+            # Find relatives
+            clusters_sub = clusters[i:]
+            select = np.any(
+                clusters_sub.reshape(-1,1) == adjacent_idx.reshape(1,-1), axis=1)
+            # Assign this cluster number to the points
+            clusters[i:] = np.where(select, min_idx, clusters_sub)
+        
+        # Return clusters
+        return clusters
