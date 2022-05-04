@@ -115,6 +115,7 @@ class RangeCollection(object):
     # Define class variables
     _ops_closed = {'left','left_mod','right','right_mod','both','neither'}
     _ops_centers = {'true_centers','begs','ends'}
+    display_max = 10
     
     def __init__(
         self, begs=None, ends=None, centers=None, closed='right', sort=True, 
@@ -187,7 +188,7 @@ centers={self.center_type})"""
             record = f'{lb}{beg: >{ld+rd+1}.{rd}f}, {end: >{ld+rd+1}.{rd}f}{rb}'
             records.append(record)
         # Address shown records
-        if self.num_ranges > 10:
+        if self.num_ranges > self.display_max:
             spacer = '~' * (ld*2 + rd*2 + 6)
             records = records[:5] + [spacer] + records[-5:]
         text = '\n'.join(records) + '\n' + str(self)
@@ -356,12 +357,18 @@ centers={self.center_type})"""
         Use a static index to set new object attributes. Equivalent to 
         __getitem__ operating inplace.
         """
-        # Flatten to avoid dimension loss
-        index = np.asarray(index).flatten()
+        # Array indexer
+        if not isinstance(index, slice):
+            # Flatten to avoid dimension loss
+            index = np.asarray(index).flatten()
         # Select from data arrays
-        self._begs = self._begs[index]
-        self._ends = self._ends[index]
-        self._keys = self._keys[index]
+        try:
+            self._begs = self._begs[index]
+            self._ends = self._ends[index]
+            self._keys = self._keys[index]
+        except:
+            raise IndexError(
+                f"Unable to index range data with provided indexer: {index}")
         # Determine center
         if self.center_type=='data':
             self._centers = self._centers[index]
