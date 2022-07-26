@@ -651,6 +651,9 @@ as a single scalar value or an array-like of scalar values.")
             extend : the final range will be anchored on the grid defined by 
                 the step value, extending beyond the step length to the right
                 bound of the range.
+            balance : if the final range is greater than or equal to half the 
+                target range length, perform the cut method; if it is less, 
+                perform the extend method.
 
             Schematics
             ----------
@@ -673,7 +676,7 @@ as a single scalar value or an array-like of scalar values.")
             extend :
                      [---------|              ]
                      [         |--------------]
-
+        
         **kwargs
             Keyword arguments used for initialization of the RangeCollection 
             class instance.
@@ -697,7 +700,7 @@ as a single scalar value or an array-like of scalar values.")
         except ValueError:
             raise TypeError("Number of steps must be an integer value.")
         # - fill
-        fill_options = {'none','cut','left','right','extend'}
+        fill_options = {'none','cut','left','right','extend','balance'}
         if fill is None:
             fill = 'cut'
         elif not fill in fill_options:
@@ -718,6 +721,11 @@ as a single scalar value or an array-like of scalar values.")
             last_end = beg - step + length
         
         # Address fill option
+        if fill == 'balance':
+            if end - last_end >= length / 2:
+                fill = 'cut'
+            else:
+                fill = 'extend'
         if last_end + step > end:
             if fill == 'none':
                 pass
