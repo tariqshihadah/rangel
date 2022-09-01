@@ -617,7 +617,7 @@ as a single scalar value or an array-like of scalar values.")
         return rc
     
     @classmethod
-    def from_steps(cls, beg, end, length=1, steps=10, fill=None, **kwargs):
+    def from_steps(cls, beg, end, length=1, steps=1, fill=None, **kwargs):
         """
         Create a collection of ranges between a begin and end point using a 
         fixed range length and a specified number of steps to define a grid to 
@@ -630,11 +630,11 @@ as a single scalar value or an array-like of scalar values.")
             range collection.
         length : numerical, default 1.0
             A fixed length for all ranges being defined.
-        steps : int, default 10
+        steps : int, default 1
             A number of steps per range length. The resulting step length will 
             be equal to length / steps. For non-overlapped ranges, use a steps 
             value of 1.
-        fill : {'none','cut','left','right'}, default 'cut'
+        fill : {'none','cut','left','right','extend','balance'}, default 'cut'
             How to fill a gap at the end of the input range.
 
             Options
