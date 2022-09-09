@@ -170,8 +170,8 @@ centers={self.center_type})"""
         # Determine number of records to show
         if self.num_ranges > self.display_max:
             # Define head/skip/tail selections
-            display_head = (self.display_max // 2)
-            display_tail = (self.display_max // 2) + (self.display_max % 2)
+            display_head = (self.display_max // 2) + (self.display_max % 2)
+            display_tail = (self.display_max // 2)
             display_skip = self.num_ranges - self.display_max
             # Define bool mask
             display_select = np.array(
