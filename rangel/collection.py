@@ -170,13 +170,6 @@ centers={self.center_type})"""
         # Determine numbers of left and right digits to display
         ld = len(str(int(self.arr.max())))
         rd = 3
-        # Determine number of records to show
-        if self.num_ranges <= 10:
-            it = zip(self.begs, self.ends, self._mod_locs)
-        else:
-            it = zip(np.append(self.begs[:5], self.begs[-5:]), 
-                     np.append(self.ends[:5], self.ends[-5:]),
-                     np.append(self._mod_locs[:5], self._mod_locs[-5:]))
         # Create formatter
         records = []
         closed = self.closed
@@ -194,15 +187,6 @@ centers={self.center_type})"""
         text = '\n'.join(records) + '\n' + str(self)
         return text
 
-        # Display a portion of the range
-        if self.num_ranges <= 10:
-            text = str(self.arr.T)
-        else:
-            rows = str(self.arr.T).split('\n')
-            tbc = ' .' * (len(rows[-1]) // 2)
-            text = '\n'.join(rows[:5]+[tbc] + rows[-5:])
-        return text + '\n' + self.__str__()
-    
     @property
     def num_ranges(self):
         return self.begs.size
