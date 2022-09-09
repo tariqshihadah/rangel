@@ -167,25 +167,52 @@ centers={self.center_type})"""
         # If no ranges present, return self as a string
         if self.num_ranges == 0:
             return str(self)
+        # Determine number of records to show
+        if self.num_ranges > self.display_max:
+            # Define head/skip/tail selections
+            display_head = (self.display_max // 2)
+            display_tail = (self.display_max // 2) + (self.display_max % 2)
+            display_skip = self.num_ranges - self.display_max
+            # Define bool mask
+            display_select = np.array(
+                [True]  * display_head + 
+                [False] * display_skip + 
+                [True]  * display_tail)
+        else:
+            # Default head/skip/tail selections
+            display_head = self.num_ranges
+            display_tail = display_skip = 0
+            display_select = np.array([True] * self.num_ranges)
         # Determine numbers of left and right digits to display
-        ld = len(str(int(self.arr.max())))
+        ld = len(str(int(self.arr.T[display_select].max())))
         rd = 3
         # Create formatter
         records = []
         closed = self.closed
-        for beg, end, mod in zip(self.begs, self.ends, self._mod_locs):
+        # Iterate over selected features and create strings
+        feature_gen = zip(
+            self.begs[display_select],
+            self.ends[display_select],
+            self._mod_locs[display_select])
+        for beg, end, mod in feature_gen:
             # Determine left and right brackets
             lb = '[' if (closed in ['left','left_mod','both']) or mod else '('
             rb = ']' if (closed in ['right','right_mod','both']) or mod else ')'
             # Format string
             record = f'{lb}{beg: >{ld+rd+1}.{rd}f}, {end: >{ld+rd+1}.{rd}f}{rb}'
             records.append(record)
-        # Address shown records
-        if self.num_ranges > self.display_max:
-            spacer = '~' * (ld*2 + rd*2 + 6)
-            records = records[:5] + [spacer] + records[-5:]
-        text = '\n'.join(records) + '\n' + str(self)
-        return text
+        # Create skipped record label if required
+        if display_skip > 0:
+            # Label skipped records
+            spacer_label = '{:,.0f} records'.format(display_skip)
+            # Format label
+            spaces = max(ld*2 + rd*2 + 6 - len(spacer_label), 6)
+            spacer = '.' * (spaces // 2) + spacer_label + \
+                '.' * (spaces // 2 + spaces % 2)
+            records = \
+                records[:display_head] + [spacer] + records[-display_tail:]
+        # Format full text string and return
+        return '\n'.join(records) + '\n' + str(self)
 
     @property
     def num_ranges(self):
