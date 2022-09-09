@@ -493,19 +493,22 @@ centers={self.center_type})"""
         try:
             centers = np.asarray(centers, dtype=float).flatten()
         except:
-            raise ValueError("Invalid centers input values. Must be provided \
-as an array-like of scalar values.")
+            raise ValueError(
+                "Invalid centers input values. Must be provided as an array-"
+                "like of scalar values.")
         try:
             lengths = np.asarray(lengths, dtype=float).flatten()
         except:
-            raise ValueError("Invalid lengths input values. Must be provided \
-as a single scalar value or an array-like of scalar values.")
+            raise ValueError(
+                "Invalid lengths input values. Must be provided as a single "
+                "scalar value or an array-like of scalar values.")
         if lengths.size == 1:
             lengths = np.tile(lengths, centers.size)
         elif lengths.size != centers.size:
-            raise ValueError(f"If provided as an array, lengths \
-(size={lengths.size:,.0f}) must be equal in size to centers array \
-(size={centers.size:,.0f}).")
+            raise ValueError(
+                f"If provided as an array, lengths (size={lengths.size:,.0f}) "
+                f"must be equal in size to centers array "
+                f"(size={centers.size:,.0f}).")
 
         # Define range begin and end points and create collection
         delta = lengths / 2
@@ -981,6 +984,81 @@ RangeCollection instances.")
         
         # Generate and return the range collection
         return cls.from_breaks(breaks=breaks, **kwargs)
+
+    def append(self, begs, ends, centers=None):
+        """
+        Append the input begin, end, and centers data to the collection. If 
+        centers in the target collection are defined dynamically, do not 
+        provide centers data.
+
+        Parameters
+        ----------
+        begs, ends : numeric or array-like
+            A single numerical value or array-like of the same representing 
+            the begin and end points of each range to be appended to the 
+            collection.
+        centers : numeric or array-like, optional
+            A single numerical value or array-like of the same representing 
+            the center points of each range to be appended to the collection. 
+            If the centers data of the target collection are defined 
+            dynamically (e.g., rc.center_type!='data'), this data should not be 
+            provided and the parameter should be left as None.
+        """
+        # Validate input begs and ends
+        if not type(begs) is type(ends):
+            raise TypeError("Input begs and ends must have the same type.")
+        if isinstance(begs, (int, float)):
+            begs = np.array([begs])
+        else:
+            try:
+                begs = np.array(begs)
+            except:
+                raise TypeError("Input begs must be number or array-like.")
+        if isinstance(ends, (int, float)):
+            ends = np.array([ends])
+        else:
+            try:
+                ends = np.array(ends)
+            except:
+                raise TypeError("Input ends must be number or array-like.")
+        # Validate equal length arrays
+        if not len(begs) == len(ends):
+            raise ValueError("Input begs and ends must be equal in length.")
+        # Validate centers
+        if self.center_type == 'data':
+            if centers is None:
+                raise ValueError(
+                    "Centers data must be provided when the target collection "
+                    "has centers data (e.g., rc.center_type=='data').")
+            elif isinstance(centers, (int, float)):
+                centers = np.array([centers])
+            else:
+                try:
+                    centers = np.array(centers)
+                except:
+                    raise TypeError(
+                        "Input centers must be number or array-like.")
+            # Validate equal length arrays
+            if not len(begs) == len(centers):
+                raise ValueError(
+                    "Input begs, ends, and centers must be equal in length.")
+        elif not centers is None:
+            raise ValueError(
+                "Centers data cannot be provided when the target collection "
+                "uses a dynamic centers definition (e.g., "
+                "rc.center_type!='data').")
+        
+        # Combine data
+        begs = np.append(self._begs, begs)
+        ends = np.append(self._ends, ends)
+        if not centers is None:
+            centers = np.append(self._centers, centers)
+        else:
+            centers = self._centers
+        # Generate new collection and return
+        rc = self.__class__(
+            begs=begs, ends=ends, centers=centers, closed=self.closed)
+        return rc
     
     def reset_keys(self, keys=None, inplace=False):
         """
@@ -990,8 +1068,9 @@ RangeCollection instances.")
             keys = np.arange(0,self.num_ranges,1,dtype=int)
         else:
             if len(keys) != self.num_ranges:
-                raise ValueError("Keys array must have a length equal to the \
-number of ranges in the collection.")
+                raise ValueError(
+                    "Keys array must have a length equal to the number of "
+                    "ranges in the collection.")
             else:
                 keys = np.asarray(keys, dtype=int)
         
@@ -1051,8 +1130,8 @@ number of ranges in the collection.")
                 rc._closed = closed
                 return rc
         else:
-            raise ValueError(f"Closed parameter must be one of \
-{self._ops_closed}.")
+            raise ValueError(
+                f"Closed parameter must be one of {self._ops_closed}.")
     
     def set_centers(self, centers=None, snap=False, inplace=False, copy=True):
         """
