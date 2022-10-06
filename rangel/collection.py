@@ -17,7 +17,7 @@ RangeCollection
 
 Dependencies
 ------------
-numpy, matplotlib, copy, warnings
+numpy, matplotlib, scipy, copy, warnings
 
 Development
 -----------
@@ -42,6 +42,7 @@ Modified:
 import numpy as np
 import matplotlib.pyplot as plt
 import copy, warnings
+from scipy import stats
 
 
 ####################
@@ -80,8 +81,8 @@ class RangeCollection(object):
         collection will default to dynamically calculated true center values.
     closed : str {'left', 'left_mod', 'right', 'right_mod', 'both', 
             'neither'}, default 'right'
-        Whether intervals are closed on the left-side, right-side, both or 
-        neither.
+        Whether collection intervals are closed on the left-side, right-side, 
+        both or neither.
 
         Options
         -------
@@ -114,6 +115,7 @@ class RangeCollection(object):
 
     # Define class variables
     _ops_closed = {'left','left_mod','right','right_mod','both','neither'}
+    _ops_closed_base = {'left','right','both','neither'}
     _ops_centers = {'true_centers','begs','ends'}
     display_max = 10
     
@@ -184,7 +186,7 @@ centers={self.center_type})"""
             display_tail = display_skip = 0
             display_select = np.array([True] * self.num_ranges)
         # Determine numbers of left and right digits to display
-        ld = len(str(int(self.arr.T[display_select].max())))
+        ld = len(str(int(self.arr[display_select].max())))
         rd = 3
         # Create formatter
         records = []
@@ -244,8 +246,11 @@ centers={self.center_type})"""
     
     @property
     def arr(self):
-        return np.stack((self.begs, self.ends, self.centers), axis=0)\
-            .reshape((3,-1))
+        return np.stack((self.begs, self.ends, self.centers), axis=1)
+
+    @property
+    def values(self):
+        return np.stack((self.begs, self.ends, self.centers), axis=0)
     
     @property
     def pairs(self):
@@ -313,6 +318,10 @@ centers={self.center_type})"""
     @closed.setter
     def closed(self, closed):
         self.set_closed(closed, inplace=True)
+
+    @property
+    def closed_base(self):
+        return self._closed_base
     
     @property
     def monotonic(self):
@@ -518,7 +527,7 @@ centers={self.center_type})"""
         return rc
 
     @classmethod
-    def from_array(cls, arr, **kwargs):
+    def from_array(cls, arr, ignore_centers=False, **kwargs):
         """
         Create a range collection from an array defining the begin and end
         bounds of each range, as well as (optionally) the centers.
@@ -526,8 +535,11 @@ centers={self.center_type})"""
         Parameters
         ----------
         arr : array-like
-            A 2D or 3D array-like of numerical values representing the begin 
-            and end bounds of each range, and (optionally) the center values.
+            A 1-2D array-like of numerical values representing the begin and 
+            end bounds of each range, and (optionally) the center values. 
+            Arrays must be of shape (x), (x,1), (x,2), or (x,3)
+        ignore_centers : bool, default False
+            Whether to ignore centers data if provided within the data array.
         **kwargs
             Keyword arguments used for initialization of the RangeCollection 
             class instance.
@@ -538,47 +550,34 @@ centers={self.center_type})"""
             RangeCollection object instance created based on the provided 
             constructor parameters.
         """
-        if np.shape(arr)[0] == 2:
-            begs = arr[0]
-            ends = arr[1]
+        # Enforce array
+        try:
+            arr = np.array(arr)
+        except:
+            raise ValueError("Input array must be coercible to np.ndarray.")
+        # Check dimensions
+        if arr.ndim == 1:
+            begs = arr
+            ends = None
             centers = None
-        elif np.shape(arr)[0] == 3:
-            begs = arr[0]
-            ends = arr[1]
-            centers = arr[2]
+        elif np.shape(arr)[1] == 1:
+            begs = arr[:,0]
+            ends = None
+            centers = None
+        elif np.shape(arr)[1] == 2:
+            begs = arr[:,0]
+            ends = arr[:,1]
+            centers = None
+        elif np.shape(arr)[1] == 3:
+            begs = arr[:,0]
+            ends = arr[:,1]
+            centers = arr[:,2] if not ignore_centers else None
         else:
-            raise ValueError("Input array must have shape of (2,x) or (3,x)")
+            raise ValueError(
+                "Input array must have shape of (x), (x,1), (x,2), or (x,3)")
         rc = cls(begs=begs, ends=ends, centers=centers, **kwargs)
         return rc
             
-    @classmethod
-    def from_tuples(cls, tuples, **kwargs):
-        """
-        Create a range collection from a list or array of tuples defining the
-        begin and end bound of each range.
-        
-        Parameters
-        ----------
-        tuples : list-like
-            A list or 1D array of tuples of numerical values representing the 
-            begin and end points of each range within the collection.
-        **kwargs
-            Keyword arguments used for initialization of the RangeCollection 
-            class instance.
-        
-        Returns
-        -------
-        rc : RangeCollection
-            RangeCollection object instance created based on the provided 
-            constructor parameters.
-        """
-        # Parse the input tuples
-        arr = np.array(tuples, dtype=float)
-        begs = arr[:,0]
-        ends = arr[:,1]
-        rc = cls(begs=begs, ends=ends, **kwargs)
-        return rc
-    
     @classmethod
     def from_breaks(cls, breaks, **kwargs):
         """
@@ -864,11 +863,12 @@ centers={self.center_type})"""
         # Validate input
         for obj in objs:
             if not isinstance(obj, cls):
-                raise TypeError("Input objects must be list-like of \
-RangeCollection instances.")
+                raise TypeError(
+                    "Input objects must be list-like of RangeCollection "
+                    "instances.")
         
         # Determine range parameters
-        arr = np.concatenate([obj.arr for obj in objs], axis=1)
+        arr = np.concatenate([obj.arr for obj in objs], axis=0)
         keys = np.concatenate([obj.keys for obj in objs])
         # Combine collections
         rc = cls.from_array(arr, keys=keys, sort=sort, **kwargs)
@@ -1116,8 +1116,8 @@ RangeCollection instances.")
         ----------
         closed : str {'left', 'left_mod', 'right', 'right_mod', 'both', 
                 'neither'}, default 'right'
-            Whether intervals are closed on the left-side, right-side, both or 
-            neither.
+            Whether collection intervals are closed on the left-side, 
+            right-side, both or neither.
         inplace : boolean, default False
             Whether to perform the operation in place on the parent range
             collection, returning None.
@@ -1125,13 +1125,16 @@ RangeCollection instances.")
         if closed in self._ops_closed:
             if inplace:
                 self._closed = closed
+                self._closed_base = closed.replace('_mod','')
             else:
                 rc = self.copy()
                 rc._closed = closed
+                rc._closed_base = closed.replace('_mod','')
                 return rc
         else:
             raise ValueError(
-                f"Closed parameter must be one of {self._ops_closed}.")
+                "Collection's closed parameter must be one of "
+                f"{self._ops_closed}.")
     
     def set_centers(self, centers=None, snap=False, inplace=False, copy=True):
         """
@@ -1256,8 +1259,8 @@ of ranges in the collection.")
         else:
             raise ValueError("Choose parameter must be first, last, or all.")
         
-    def locate(self, loc, choose='first', closed=None, snap=None, 
-               return_dist=False, *args, **kwargs):
+    def locate(self, loc, choose='first', snap=None, return_dist=False, *args, 
+               **kwargs):
         """
         Get the index of the range which intersects the input location value
         as well as the proportional position along that range where it falls.
@@ -1270,9 +1273,6 @@ of ranges in the collection.")
         choose : {'first', 'last', 'all'}, default 'first'
             Which range to return information for if multiple ranges are found 
             which intersect with the provided location.
-        closed : str {None, 'left', 'right', 'both', 'neither'}, default None
-            Whether intervals are closed on the left side, right side, both or 
-            neither. If None, default to the collection's current setting.
         snap : {None, 'near', 'left', 'right'}, default None
             If the input location does not fall within any ranges, snap to the 
             nearest match based on distance, choosing the closest range to the 
@@ -1298,7 +1298,7 @@ of ranges in the collection.")
         """
         self._validate_monotonic()
         # Get index of ranges which intersect the input location
-        index = np.where(self.is_intersecting(beg=loc, closed=closed))[0]
+        index = np.where(self.intersecting(beg=loc))[0]
         
         # Check for at least one range
         if len(index) == 0:
@@ -1374,7 +1374,7 @@ between 0 and {self.num_ranges - 1}.")
         val = rc.begs[0] + rc.lengths[0] * dist
         return val
     
-    def is_before(self, loc=None, closed=None, **kwargs):
+    def is_before(self, loc=None, **kwargs):
         """
         Get boolean mask for ranges which fall entirely before the given range 
         location.
@@ -1385,19 +1385,15 @@ between 0 and {self.num_ranges - 1}.")
         if loc is None:
             raise ValueError("No input point provided.")
         
-        # Validate closed
-        if closed is None:
-            closed = self.closed
-        
         # Test for intersecting
-        if closed in ['right', 'both']:
+        if self._closed in ['right', 'both']:
             t1 = self.ends  < loc
-        elif closed in ['left', 'neither']:
+        elif self._closed in ['left', 'neither']:
             t1 = self.ends <= loc
         
         return t1
     
-    def is_behind(self, loc=None, closed=None, **kwargs):
+    def is_behind(self, loc=None, **kwargs):
         """
         Get boolean mask for ranges which fall entirely behind the given range 
         location.
@@ -1408,14 +1404,10 @@ between 0 and {self.num_ranges - 1}.")
         if loc is None:
             raise ValueError("No input point provided.")
         
-        # Validate closed
-        if closed is None:
-            closed = self.closed
-        
         # Test for intersecting
-        if closed in ['left', 'both']:
+        if self._closed in ['left', 'both']:
             t1 = self.begs  > loc
-        elif closed in ['right', 'neither']:
+        elif self._closed in ['right', 'neither']:
             t1 = self.ends >= loc
         
         return t1
@@ -1434,14 +1426,14 @@ between 0 and {self.num_ranges - 1}.")
             Location value to snap to a range.
         """
         # Check if already intersecting
-        if self.intersecting(beg=loc, closed='both').any():
+        if self.set_closed('both').intersecting(beg=loc, closed='both').any():
             return loc
         else:
             # Snap to bounds
             bounds = self.pairs.flatten()
             return bounds[np.abs(bounds - loc).argmin()]
     
-    def intersecting(self, beg=None, end=None, closed=None, validate=True, 
+    def intersecting(self, beg=None, end=None, closed='both', validate=True, 
                      squeeze=True, **kwargs):
         """
         Get boolean mask for ranges which intersect the given range values. If 
@@ -1456,10 +1448,9 @@ between 0 and {self.num_ranges - 1}.")
             multiple, provide an array-like with a single begin and end value 
             for each range. If no end parameter provided, point locations will 
             be assumed and end will be set equal to beg.
-        closed : str {'left', 'left_mod', 'right', 'right_mod', 'both', 
-                'neither'}, optional
-            Whether intervals are closed on the left-side, right-side, both or 
-            neither. If not provided, default to collection property.
+        closed : str {'left', 'right', 'both', 'neither'}, default 'both'
+            Whether input intervals are closed on the left-side, right-side, 
+            both or neither.
         validate : boolean, default True
             Whether to validate the input begin and end location information. 
             Unless externally validated, always use True.
@@ -1484,28 +1475,27 @@ between 0 and {self.num_ranges - 1}.")
             beg, end = self._validate_beg_end(beg, end)
         
         # Validate closed
-        if closed is None:
-            closed = self.closed
+        closed = self._validate_closed_other(closed)
         
         # Test for intersecting
         rbegs = self.begs.reshape(-1,1)
         rends = self.ends.reshape(-1,1)
         if closed in ['left','left_mod','both']:
             t1 = np.less_equal(rbegs, end.reshape(1,-1))
-        elif closed in ['right','right_mod','neither']:
+        elif closed in ['right','right_mod','neither','left_end','right_end']:
             t1 = np.less(rbegs, end.reshape(1,-1))
         if closed in ['right','right_mod','both']:
             t2 = np.greater_equal(rends, beg.reshape(1,-1))
-        elif closed in ['left','left_mod','neither']:
+        elif closed in ['left','left_mod','neither','left_end','right_end']:
             t2 = np.greater(rends, beg.reshape(1,-1))
 
         # Modify test for specific closed cases
-        if closed in ['left_mod']:
+        if closed in ['left_mod','right_end']:
             # Perform tests on modified edge locations
             mod_locs = self._mod_locs
             t2[mod_locs,:] = \
                 np.greater_equal(rends[mod_locs,:], beg.reshape(1,-1))
-        elif closed in ['right_mod']:
+        elif closed in ['right_mod','left_end']:
             # Perform tests on modified edge locations
             mod_locs = self._mod_locs
             t1[mod_locs,:] = \
@@ -1733,76 +1723,6 @@ between 0 and {self.num_ranges - 1}.")
         else:
             return res
     
-    def get_before(self, loc=None, closed=None):
-        """
-        Return only those ranges which fall entirely before the given range 
-        location.
-
-        Parameters
-        ----------
-        loc : float
-            Range location of the overlaid point.
-        """
-        select = self.is_before(loc=loc, closed=closed)
-        return self[select]
-    
-    def get_behind(self, loc=None, closed=None):
-        """
-        Return only those ranges which fall entirely behind the given range 
-        location.
-
-        Parameters
-        ----------
-        loc : float
-            Range location of the overlaid point.
-        """
-        select = self.is_behind(loc=loc, closed=closed)
-        return self[select]
-    
-    def get_inside(self, beg=None, end=None):
-        """
-        Return only those ranges which fall entirely within the given range 
-        values.
-
-        Parameters
-        ----------
-        beg : float
-            Begin location of the overlaid range.
-        end : float
-            End location of the overlaid range.
-        """
-        select = self.is_inside(beg, end)
-        return self[select]
-    
-    def get_intersecting(self, beg=None, end=None):
-        """
-        Return only those ranges which intersect the given range values.
-
-        Parameters
-        ----------
-        beg : float
-            Begin location of the overlaid range.
-        end : float
-            End location of the overlaid range.
-        """
-        select = self.is_intersecting(beg, end)
-        return self[select]
-    
-    def get_nonintersecting(self, beg=None, end=None):
-        """
-        Return only those ranges which do not intersect the given range 
-        values.
-
-        Parameters
-        ----------
-        beg : float
-            Begin location of the overlaid range.
-        end : float
-            End location of the overlaid range.
-        """
-        select = ~self.is_intersecting(beg, end)
-        return self[select]
-    
     def overlay(self, beg=None, end=None, normalize=True, how='right', 
                 norm_zero=None, squeeze=True, validate=True, **kwargs):
         """
@@ -1919,6 +1839,42 @@ between 0 and {self.num_ranges - 1}.")
                     "numerical values.")
         # Return validate begin and end data
         return beg, end
+
+    def _validate_closed_other(self, closed):
+        """
+        Modify the collection's closed parameter based on the input closed 
+        parameter. This is used to account for instances of intersecting other 
+        ranges with this collection when those ranges have a closed parameter 
+        other than both.
+        """
+        # Validate option
+        if not closed in self._ops_closed_base:
+            raise ValueError(
+                "Input closed parameter must be one of "
+                f"{self._ops_closed_base}.")
+                
+        # Invert function
+        def invert(op):
+            if op == 'left':
+                return 'right'
+            elif op == 'right':
+                return 'left'
+            else:
+                return op
+
+        # Simplify combinations of closed parameters
+        if closed == 'both':
+            return self._closed
+        elif (closed == 'neither') or (self._closed == 'neither'):
+            return 'neither'
+        elif closed != self._closed_base:
+            return self._closed_base
+        elif self._closed == 'both':
+            return invert(closed)
+        elif 'mod' in self._closed:
+            return invert(closed) + '_end'
+        else:
+            return 'neither'
     
     def sortranges(self, by='begs', ascending=True, return_index=False, 
                    return_inverse=False, inplace=False):
@@ -2008,7 +1964,7 @@ between 0 and {self.num_ranges - 1}.")
         
         # Analyze unique combinations of begin and end points
         unique, uindex, ucounts = np.unique(
-            self.arr, axis=1, 
+            self.values, axis=1, 
             return_index=True,
             return_counts=True
         )
@@ -2144,13 +2100,6 @@ between 0 and {self.num_ranges - 1}.")
         """
         Remove left and right wings from all ranges which fall 
         completely inside of another range.
-        
-        Parameters
-        ----------
-        closed : boolean, default False
-            Whether to define a range as inside the comparison range
-            even if at least one of its edges coincides with the 
-            comparison range's edge.
         """
         self._validate_monotonic()
         # Identify all inside ranges
@@ -2605,8 +2554,8 @@ between 0 and {self.num_ranges - 1}.")
                 "begin point.")
         
         # Eliminate non-intersecting ranges
-        before = self.is_before(loc=beg, closed='both')
-        behind = self.is_behind(loc=end, closed='both')
+        before = self.set_closed('both').is_before(loc=beg)
+        behind = self.set_closed('both').is_behind(loc=end)
         
         # Clip ranges
         lefts  = np.max([self.begs, np.full(self.begs.shape, beg)], axis=0)
@@ -2921,7 +2870,7 @@ equal to the number of ranges in the collection.")
         else:
             return rc
 
-    def cluster(self, buffer=None, closed=None):
+    def cluster(self, buffer=None, **kwargs):
         """
         Identify clusters of ranges which overlap, returning an array of 
         cluster indices. Returned indices will include a single value for each 
@@ -2935,10 +2884,6 @@ equal to the number of ranges in the collection.")
         buffer : scalar, optional
             A numerical buffer to be applied to ranges before checking for 
             overlaps.
-        closed : str {'left', 'left_mod', 'right', 'right_mod', 'both', 
-                'neither'}, default 'right'
-            Whether intervals are closed on the left-side, right-side, both or 
-            neither.
         """
         # Buffer self if requested
         if not buffer is None:
@@ -2950,7 +2895,7 @@ equal to the number of ranges in the collection.")
         clusters = default_clusters.copy()
         # Identify intersecting ranges
         intersecting = rc.intersecting(
-            rc.begs, rc.ends, validate=False, squeeze=False, closed=closed)
+            rc.begs, rc.ends, validate=False, squeeze=False)
         # Cull duplicates
         intersecting[np.tril_indices(rc.num_ranges, -1)] = False
         # Identify intersecting clusters
@@ -2962,9 +2907,149 @@ equal to the number of ranges in the collection.")
             # Find relatives
             clusters_sub = clusters[i:]
             select = np.any(
-                clusters_sub.reshape(-1,1) == adjacent_idx.reshape(1,-1), axis=1)
+                clusters_sub.reshape(-1,1) == \
+                adjacent_idx.reshape(1,-1), axis=1)
             # Assign this cluster number to the points
             clusters[i:] = np.where(select, min_idx, clusters_sub)
         
         # Return clusters
         return clusters
+
+    def distribute(
+        self,
+        data,
+        values=None,
+        blur_size=0,
+        blur_style='linear',
+        length_normalize=True,
+        **kwargs
+    ):
+        """
+        Intersect and distribute events over the range collection, scaling 
+        their values relative to their indexed distance from their intersecting 
+        range location.
+        
+        Parameters
+        ----------
+        data : RangeCollection or 1-2D array-like
+            The ranges of the locations of target events being analyzed. All 
+            ranges should fall within the defined bounds (if provided) to be 
+            considered in the analysis.
+        values : numeric or 1d array-like, optional
+            The value(s) associated with each event being analyzed. If not 
+            provided, all values will default to be 1.
+        blur_size : int, default 0
+            The number of pixels to blur events across based on the blur style.
+        blur_style : str or callable, default 'linear'
+            The scaling function to be called at each blurring step to scale 
+            original values. If a callable is provided, it must accept a single 
+            integer input for the zero-indexed pixel number, returning a single 
+            float scaling value. Predefined blurring functions can be called 
+            using the following labels:
+            
+            Options
+            -------
+            linear : linearly scale down values from the original value to zero 
+                at the first index outside the blurred pixel range
+            norm_static : Tk
+            norm_scale : Tk
+            none : do not scale down original values
+
+        length_normalize : bool, default True
+            Normalize the intersection scores by the length of the range to 
+            account for differing range lengths.
+                
+        Created:  2022-10-04
+        """
+        ##################
+        # VALIDATE INPUT #
+        ##################
+
+        # Check for valid data dimensions; if no valid ranges to operate over, 
+        # return an appropriately dimensioned zero array
+        if (data.num_ranges == 0) or (self.num_ranges == 0):
+            return np.zeros((self.num_ranges, data.num_ranges))
+        
+        # Validate input range collection
+        if not isinstance(data, RangeCollection):
+            try:
+                data = RangeCollection.from_array(data, sort=False)
+            except:
+                raise ValueError(
+                    "Input data must be range collection type or compatible "
+                    "with RangeCollection.from_array() class method.")
+        
+        # Validate blur style
+        if blur_style in [None, 'none'] or blur_size==0:
+            blur_function = lambda n: 1
+        elif blur_style in ['linear','lin']:
+            blur_function = lambda n: (blur_size - n + 1) / (blur_size + 1)
+        elif blur_style in ['norm_static']:
+            blur_function = lambda n: stats.norm.pdf(n)
+        elif blur_style in ['norm_scale']:
+            blur_function = lambda n: stats.norm.pdf(n * 3, scale=blur_size)
+        elif callable(blur_style):
+            blur_function = blur_style
+        else:
+            raise ValueError(
+                "Input blur_style must be callable or label of valid "
+                "predefined scaling function.")
+        
+        # Validate values data
+        if not values is None:
+            try:
+                # Extend single scalar value
+                values = np.full(data.num_ranges, float(values))
+            except:
+                try:
+                    # Coerce array-like to array
+                    values = np.asarray(values, dtype=float).flatten()
+                except:
+                    raise TypeError(
+                        "Could not convert input values to np.ndarray of "
+                        "dtype float.")
+                # Check for appropriate size
+                if not len(values) == data.num_ranges:
+                    raise ValueError(
+                        "Number of event values must be equal to the number "
+                        f"of events provided. Provided: {data.num_ranges} "
+                        f"events, {len(values)} values.")
+        
+        ####################
+        # PERFORM ANALYSIS #
+        ####################
+        
+        # Intersect events data with analysis range collection to determine 
+        # initial intersection scores
+        intx = self.intersecting(
+            beg=data.begs, end=data.ends, squeeze=False) * 1 # coerce integer
+        
+        # Blur events data by stepping through the blur range and applying the 
+        # blur function to scale the initial pixel scores and add them
+        scale = blur_function(0)
+        result = intx * scale
+        for step in range(1, blur_size + 1):
+            # Create and blur buffered result data
+            scale = blur_function(step)
+            buff = np.pad(intx, ((step, step), (0, 0)), mode='constant') * scale
+            # Apply buffered result data
+            forw = buff[:-step * 2, :]
+            back = buff[step * 2:, :]
+            result += forw + back
+            
+        # Normalize result data scores by target range lengths
+        if length_normalize:
+            term = self.lengths.reshape(-1,1)
+            result = np.multiply(result, term)
+        
+        # Normalize data scores to a single unit per record
+        denom = result.sum(axis=0)
+        result = np.divide(
+            result, denom, out=np.zeros_like(result), where=denom!=0)
+        
+        # Apply values if used
+        if not values is None:
+            result = np.multiply(result, values)
+        
+        # Return results
+        return result
