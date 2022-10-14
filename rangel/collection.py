@@ -97,7 +97,7 @@ class RangeCollection(object):
         both : ranges are always closed on both sides
         neither : ranges are never closed on either side
             
-    sort : boolean, default True
+    sort : boolean, default False
         Whether to automatically sort the ranges by begin points or to leave
         them in the order they are input.
     snap_centers : boolean, default False
@@ -120,23 +120,24 @@ class RangeCollection(object):
     display_max = 10
     
     def __init__(
-        self, begs=None, ends=None, centers=None, closed='right', sort=True, 
+        self, begs=None, ends=None, centers=None, closed='right', sort=False, 
         snap_centers=False, copy=True, force_monotonic=True, keys=None):
 
-        # Establish closed parameters
-        self.set_closed(closed, inplace=True)
-        
         # Process ranges
         if begs is None:
             begs = []
         if ends is None:
             ends = begs
-        begs = np.array(begs, dtype=float, copy=copy)
-        ends = np.array(ends, dtype=float, copy=copy)
+        begs = np.array(begs, dtype=float, copy=copy).flatten()
+        ends = np.array(ends, dtype=float, copy=copy).flatten()
         self._begs = begs.copy()
         self._ends = ends.copy()
+        # Set centers
         self.set_centers(centers, inplace=True, snap=snap_centers, copy=copy)
-    
+
+        # Set closed parameters
+        self.set_closed(closed, inplace=True)
+        
         # Reset keys
         self.reset_keys(keys=keys, inplace=True) 
         
@@ -1126,10 +1127,12 @@ centers={self.center_type})"""
             if inplace:
                 self._closed = closed
                 self._closed_base = closed.replace('_mod','')
+                self._set_mod_locs()
             else:
                 rc = self.copy()
                 rc._closed = closed
                 rc._closed_base = closed.replace('_mod','')
+                rc._set_mod_locs()
                 return rc
         else:
             raise ValueError(
@@ -1202,8 +1205,8 @@ of ranges in the collection.")
         for i in range(self.num_ranges):
             yield self[i]
     
-    def plot(self, ax=None, figsize=None, centers=True, one_line=False, 
-             *args, **kwargs):
+    def plot(self, ax=None, figsize=None, centers=True, closed=True,
+             one_line=False, voffset=0, *args, **kwargs):
         """
         Create a simple plot of the range collection using matplotlib's pyplot 
         interface. All provided **kwargs are passed directly to the ax.plot() 
@@ -1213,11 +1216,33 @@ of ranges in the collection.")
         if ax is None:
             fig = plt.figure(figsize=figsize)
             ax = fig.add_subplot(1,1,1)
+        # Iterate over all ranges and plot individually
+        colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
         for i, rng in enumerate(self.iterranges()):
-            ax.plot([rng.begs, rng.ends], ([0, 0] if one_line else [-i, -i]),
-                    **kwargs)
+            # Select range color
+            color = colors[i % len(colors)]
+            # Plot the range line
+            ax.plot([rng.begs, rng.ends], 
+                ([voffset, voffset] if one_line else [-i+voffset, -i+voffset]),
+                color=color, **kwargs)
+            # Plot center points
             if centers:
-                ax.scatter(rng.centers, -i, **kwargs)
+                ax.scatter(rng.centers, voffset if one_line else -i+voffset,
+                    color=color, **kwargs)
+            # Plot closed edges
+            if closed:
+                left_closed = \
+                    (self._closed in ['left','both','left_mod']) or \
+                    (self._closed in ['right_mod'] and self._mod_locs[i])
+                right_closed = \
+                    (self._closed in ['right','both','right_mod']) or \
+                    (self._closed in ['left_mod'] and self._mod_locs[i])
+                if left_closed:
+                    ax.scatter(rng.begs, voffset if one_line else -i+voffset,
+                        marker=4, s=120, color=color, **kwargs)
+                if right_closed:
+                    ax.scatter(rng.ends, voffset if one_line else -i+voffset,
+                        marker=5, s=120, color=color, **kwargs)
         return ax
     
     def search(self, loc=None, by='begs', choose='first'):
@@ -1433,7 +1458,7 @@ between 0 and {self.num_ranges - 1}.")
             bounds = self.pairs.flatten()
             return bounds[np.abs(bounds - loc).argmin()]
     
-    def intersecting(self, beg=None, end=None, closed='both', validate=True, 
+    def intersecting_old(self, beg=None, end=None, closed='both', validate=True, 
                      squeeze=True, **kwargs):
         """
         Get boolean mask for ranges which intersect the given range values. If 
@@ -1471,35 +1496,40 @@ between 0 and {self.num_ranges - 1}.")
         self._validate_monotonic()
         
         # Validate input events
-        if validate:
-            beg, end = self._validate_beg_end(beg, end)
+        rc = self.__class__(beg, end, closed=closed, sort=False, )
         
         # Validate closed
         closed = self._validate_closed_other(closed)
         
-        # Test for intersecting
-        rbegs = self.begs.reshape(-1,1)
-        rends = self.ends.reshape(-1,1)
+        #
+        # Initial testing
+        #
+        left_begs = self.begs.reshape(-1,1)
+        left_ends = self.ends.reshape(-1,1)
+        right_begs = rc.begs.reshape(1,-1)
+        right_ends = rc.ends.reshape(1,-1)
         if closed in ['left','left_mod','both']:
-            t1 = np.less_equal(rbegs, end.reshape(1,-1))
+            t1 = np.less_equal(left_begs, right_ends)
         elif closed in ['right','right_mod','neither','left_end','right_end']:
-            t1 = np.less(rbegs, end.reshape(1,-1))
+            t1 = np.less(left_begs, right_ends)
         if closed in ['right','right_mod','both']:
-            t2 = np.greater_equal(rends, beg.reshape(1,-1))
+            t2 = np.greater_equal(left_ends, right_begs)
         elif closed in ['left','left_mod','neither','left_end','right_end']:
-            t2 = np.greater(rends, beg.reshape(1,-1))
+            t2 = np.greater(left_ends, right_begs)
 
-        # Modify test for specific closed cases
-        if closed in ['left_mod','right_end']:
+        #
+        # Adjust for modified edges - left ranges
+        # 
+        if self._closed in ['left_mod','right_end']:
             # Perform tests on modified edge locations
             mod_locs = self._mod_locs
             t2[mod_locs,:] = \
-                np.greater_equal(rends[mod_locs,:], beg.reshape(1,-1))
-        elif closed in ['right_mod','left_end']:
+                np.greater_equal(left_ends[mod_locs,:], right_begs)
+        elif self._closed in ['right_mod','left_end']:
             # Perform tests on modified edge locations
             mod_locs = self._mod_locs
             t1[mod_locs,:] = \
-                np.less_equal(rbegs[mod_locs,:], end.reshape(1,-1))
+                np.less_equal(left_begs[mod_locs,:], right_ends)
         
         # Combine test results and squeeze if requested
         res = t1 & t2
@@ -1509,14 +1539,109 @@ between 0 and {self.num_ranges - 1}.")
         # Return final test results
         return res
 
-    @property
-    def _mod_locs(self):
+    def intersecting(self, beg=None, end=None, other=None, closed='both', 
+                     squeeze=True, **kwargs):
+        """
+        Get boolean mask for ranges which intersect the given range values. If 
+        multiple ranges given, return a mask array with a second dimension 
+        equal to the number of ranges provided.
+
+        Parameters
+        ----------
+        beg, end : numerical or array-like, optional
+            The begin and end locations of the range or ranges to be tested. If 
+            a single range is to be tested, provide a numeric value. If 
+            multiple, provide an array-like with a single begin and end value 
+            for each range. If no end parameter provided, point locations will 
+            be assumed and end will be set equal to beg. Not required if other 
+            parameter is used.
+        other : RangeCollection, optional
+            Other RangeCollection instance to be intersected with this one. Can 
+            be provided instead of beg, end, and closed parameters and will 
+            take precedence over other input.
+        closed : str {'left', 'left_mod', 'right', 'right_mod', 'both', 
+                'neither'}, default 'right'
+            Whether collection intervals are closed on the left-side, 
+            right-side, both or neither.
+        squeeze : boolean, default True
+            Whether to reduce the dimensions of the output array to 1D if only 
+            a single begin/end location was provided. If False, output array 
+            will always be 2D.
+
+        Returns
+        -------
+        mask : np.ndarray
+            A numpy array with a first dimension equal to the number of ranges 
+            in the collection and a second dimension equal to the number of 
+            ranges being tested against the collection. If a single numerical 
+            value is provided for the begin and end test range, a 1d-array will 
+            be returned.
+        """
+        self._validate_monotonic()
+        
+        # Validate input events
+        if not other is None:
+            if not isinstance(other, RangeCollection):
+                raise TypeError(
+                    "If provided, input other parameter must be valid "
+                    "RangeCollection instance.")
+            rc = other
+        else:
+            rc = self.__class__(beg, end, closed=closed, sort=False, )
+        
+        # Reshape range data for testing
+        left_begs = self.begs.reshape(-1,1)
+        left_ends = self.ends.reshape(-1,1)
+        right_begs = rc.begs.reshape(1,-1)
+        right_ends = rc.ends.reshape(1,-1)
+
+        # Initial testing
+        logic = np.greater(left_ends, right_begs) & \
+            np.less(left_begs, right_ends)
+        left_edges  = np.equal(left_begs, right_ends)
+        right_edges = np.equal(left_ends, right_begs)
+
+        # Adjust for standard edges
+        if self._closed_base in ['left','both'] and \
+            rc._closed_base in ['right','both']:
+            logic |= left_edges
+        if self._closed_base in ['right','both'] and \
+            rc._closed_base in ['left','both']:
+            logic |= right_edges
+
+        # Adjust for modified edges
+        # - Check left range collection
+        if self._closed in ['left_mod'] and \
+            rc._closed_base in ['left','both']:
+            logic[self._mod_locs,:] |= right_edges[self._mod_locs,:]
+        elif self._closed in ['right_mod'] and \
+            rc._closed_base in ['right','both']:
+            logic[self._mod_locs,:] |= left_edges[self._mod_locs,:]
+        # - Check right range collection
+        if rc._closed in ['left_mod'] and \
+            self._closed_base in ['left','both']:
+            logic[:,rc._mod_locs] |= left_edges[:,rc._mod_locs]
+        elif rc._closed in ['right_mod'] and \
+            self._closed_base in ['right','both']:
+            logic[:,rc._mod_locs] |= right_edges[:,rc._mod_locs]
+        
+        # Combine test results and squeeze if requested
+        if logic.shape[1] == 1 and squeeze:
+            logic = logic.flatten()
+
+        # Return final test results
+        return logic
+
+    def _set_mod_locs(self):
         """
         Get indexes of ranges with modified edges. Only applicable when 
         self.closed in ['left_mod','right_mod'].
         """
+        # Require minimum ranges
+        if self.num_ranges == 0:
+            mod_locs = np.zeros(self.begs.shape, dtype=bool)
         # Modify test for specific closed cases
-        if self.closed in ['left_mod']:
+        elif self.closed in ['left_mod']:
             # Identify ends of group ranges which will be modified
             mod_locs = self.are_overlapping(all_=False, when_one=np.array([], dtype=bool), enforce_edges=True)
             mod_locs = np.append(~mod_locs, True)
@@ -1526,7 +1651,15 @@ between 0 and {self.num_ranges - 1}.")
             mod_locs = np.append(True, ~mod_locs)
         else:
             mod_locs = np.zeros(self.begs.shape, dtype=bool)
-        return mod_locs
+        self._mod_locs = mod_locs
+
+    @property
+    def mod_locs(self):
+        """
+        Get indexes of ranges with modified edges. Only applicable when 
+        self.closed in ['left_mod','right_mod'].
+        """
+        return self._mod_locs
 
     def is_concentric(self, center=None):
         """
@@ -1848,10 +1981,10 @@ between 0 and {self.num_ranges - 1}.")
         other than both.
         """
         # Validate option
-        if not closed in self._ops_closed_base:
+        if not closed in self._ops_closed:
             raise ValueError(
                 "Input closed parameter must be one of "
-                f"{self._ops_closed_base}.")
+                f"{self._ops_closed}.")
                 
         # Invert function
         def invert(op):

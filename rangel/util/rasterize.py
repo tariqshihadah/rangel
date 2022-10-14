@@ -15,9 +15,9 @@ def rasterize(
     **kwargs
 ):
     """
-    Digitize and buffer events over a defined range, extending them across 
-    uniform steps within the range and scaling their values relative to their 
-    digital distance from their intersecting step location.
+    Intersect and distribute events over the range collection, scaling their 
+    values relative to their indexed distance from their intersecting step 
+    location.
     
     Parameters
     ----------
