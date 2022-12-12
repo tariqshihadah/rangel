@@ -43,6 +43,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy, warnings
 from scipy import stats
+from rangel.util.logic import _ArrayLogicManager
 
 
 ####################
@@ -1517,32 +1518,36 @@ between 0 and {self.num_ranges - 1}.")
         # Initial testing
         logic = np.greater(left_ends, right_begs) & \
             np.less(left_begs, right_ends)
-        left_edges  = np.equal(left_begs, right_ends)
-        right_edges = np.equal(left_ends, right_begs)
 
-        # Adjust for standard edges
-        if self._closed_base in ['left','both'] and \
-            rc._closed_base in ['right','both']:
-            logic |= left_edges
-        if self._closed_base in ['right','both'] and \
-            rc._closed_base in ['left','both']:
-            logic |= right_edges
+        # If edges are in play for both sets of ranges, adjust accordingly
+        if not 'neither' in [self._closed_base, rc._closed_base]:
+            # Prepare edge logic arrays
+            left_edges  = _ArrayLogicManager(left_begs, right_ends)
+            right_edges = _ArrayLogicManager(left_ends, right_begs)
 
-        # Adjust for modified edges
-        # - Check left range collection
-        if self._closed in ['left_mod'] and \
-            rc._closed_base in ['left','both']:
-            logic[self._mod_locs,:] |= right_edges[self._mod_locs,:]
-        elif self._closed in ['right_mod'] and \
-            rc._closed_base in ['right','both']:
-            logic[self._mod_locs,:] |= left_edges[self._mod_locs,:]
-        # - Check right range collection
-        if rc._closed in ['left_mod'] and \
-            self._closed_base in ['left','both']:
-            logic[:,rc._mod_locs] |= left_edges[:,rc._mod_locs]
-        elif rc._closed in ['right_mod'] and \
-            self._closed_base in ['right','both']:
-            logic[:,rc._mod_locs] |= right_edges[:,rc._mod_locs]
+            # Adjust for standard edges
+            if self._closed_base in ['left','both'] and \
+                rc._closed_base in ['right','both']:
+                logic |= left_edges.equal
+            if self._closed_base in ['right','both'] and \
+                rc._closed_base in ['left','both']:
+                logic |= right_edges.equal
+
+            # Adjust for modified edges
+            # - Check left range collection
+            if self._closed in ['left_mod'] and \
+                rc._closed_base in ['left','both']:
+                logic[self._mod_locs,:] |= right_edges.equal[self._mod_locs,:]
+            elif self._closed in ['right_mod'] and \
+                rc._closed_base in ['right','both']:
+                logic[self._mod_locs,:] |= left_edges.equal[self._mod_locs,:]
+            # - Check right range collection
+            if rc._closed in ['left_mod'] and \
+                self._closed_base in ['left','both']:
+                logic[:,rc._mod_locs] |= left_edges.equal[:,rc._mod_locs]
+            elif rc._closed in ['right_mod'] and \
+                self._closed_base in ['right','both']:
+                logic[:,rc._mod_locs] |= right_edges.equal[:,rc._mod_locs]
         
         # Combine test results and squeeze if requested
         if logic.shape[1] == 1 and squeeze:
