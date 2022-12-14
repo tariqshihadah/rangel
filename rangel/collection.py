@@ -819,18 +819,24 @@ centers={self.center_type})"""
             masks = []
             indices = []
             for obj in objs:
-                # Intersect all parent collection ranges with new collection
-                mask = rc.intersecting(
-                    obj.begs, obj.ends, closed='neither', squeeze=False)
-                masks.append(mask.any(axis=1))
-                # Determine parent range; if none, return an index of 
-                # null_index
-                if mask.size == 0:
-                    indices.append(np.full(rc.num_ranges, null_index))
+                # Check for range content
+                if obj.num_ranges > 0:
+                    # Intersect all parent collection ranges with new collection
+                    mask = rc.set_closed('neither').intersecting(
+                        obj.begs, obj.ends, closed='neither', squeeze=False)
+                    masks.append(mask.any(axis=1))
+                    # Determine parent range; if none, return an index of 
+                    # null_index
+                    if mask.size == 0:
+                        indices.append(np.full(rc.num_ranges, null_index))
+                    else:
+                        argmax = mask.argmax(axis=1)
+                        indices.append(
+                            np.where(mask.max(axis=1), argmax, null_index))
+                # If a range is empty, append default data
                 else:
-                    argmax = mask.argmax(axis=1)
-                    indices.append(
-                        np.where(mask.max(axis=1), argmax, null_index))
+                    masks.append(np.zeros(rc.num_ranges, dtype=bool))
+                    indices.append(np.full(rc.num_ranges, null_index))
         
         # Remove gaps if requested
         if not fill_gaps:

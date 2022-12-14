@@ -22,8 +22,7 @@ class _ArrayLogicManager(object):
             assert isinstance(obj, np.ndarray)
             self._left = obj
         except:
-            return IndexError(
-                "Input objects must be 1D np.ndarrays of equal size.")
+            raise IndexError("Input objects must be np.ndarrays.")
     
     @property
     def right(self):
@@ -35,8 +34,7 @@ class _ArrayLogicManager(object):
             assert isinstance(obj, np.ndarray)
             self._right = obj
         except:
-            return IndexError(
-                "Input objects must be 1D np.ndarrays of equal size.")
+            raise IndexError("Input objects must be np.ndarrays.")
     
     @property
     def equal(self):
