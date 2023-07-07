@@ -2215,6 +2215,43 @@ between 0 and {self.num_ranges - 1}.")
                 rc.drop_short(inplace=True)
             return rc
 
+    def round(self, decimals=0, factor=1, round_centers=False, inplace=False):
+        """
+        Round the bounds of all ranges to the specified number of decimals 
+        or to a specified rounding factor.
+
+        Parameters
+        ----------
+        decimals : int, default 0
+            Number of decimals to round range bound values to.
+        factor : scalar, default 1
+            Rounding factor to apply to the range bound values. For example, 
+            use `factor=0.5` (and `decimals=0`) to round each value to the 
+            nearest 0.5.
+        round_centers : bool, default False
+            Whether to round explicitly defined centers. Only applicable when 
+            `self.center_type=='data'`.
+        """
+        # Perform rounding
+        begs = np.round(self.begs / factor, decimals=decimals) * factor
+        ends = np.round(self.ends / factor, decimals=decimals) * factor
+        if round_centers and (self.center_type=='data'):
+            centers = \
+                np.round(self.centers / factor, decimals=decimals) * factor
+    
+        # Apply update
+        rc = self if inplace else self.copy(deep=True)
+        rc._begs = begs
+        rc._ends = ends
+        if round_centers and (self.center_type=='data'):
+            rc._centers = centers
+
+        # If not inplace, return updated object
+        if not inplace:
+            return rc
+        else:
+            return
+
     def separate(self, by=None, eliminate_inside=False, drop_short=False, 
                  inplace=False, **kwargs):
         """
