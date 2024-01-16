@@ -16,7 +16,7 @@ setup(
     long_description_content_type="text/markdown",
     long_description=LONG_DESCRIPTION,
     packages=find_packages(),
-    install_requires=['numpy', 'matplotlib'],
+    install_requires=['numpy', 'matplotlib', 'scipy'],
     keywords=['python', 'range', 'numeric', 'interval'],
     classifiers=[
         "Development Status :: 1 - Planning",
