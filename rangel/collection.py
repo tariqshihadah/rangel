@@ -122,15 +122,15 @@ class RangeCollection(object):
     
     def __init__(
         self, begs=None, ends=None, centers=None, closed='right', sort=False, 
-        snap_centers=False, copy=True, force_monotonic=True, keys=None):
+        snap_centers=False, copy=None, force_monotonic=True, keys=None):
 
         # Process ranges
         if begs is None:
             begs = []
         if ends is None:
             ends = begs
-        begs = np.array(begs, dtype=float, copy=copy).flatten()
-        ends = np.array(ends, dtype=float, copy=copy).flatten()
+        begs = np.asarray(begs, dtype=float, copy=copy).flatten()
+        ends = np.asarray(ends, dtype=float, copy=copy).flatten()
         self._begs = begs.copy()
         self._ends = ends.copy()
         # Set centers
