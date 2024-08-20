@@ -2,7 +2,7 @@
 Module featuring `RangeCollection` object class for the management of range data and optimized performance of various simple and complex range operations, including range and point overlays, equitable and score-based separation of overlapping ranges, generation of random range data, and range data comparisons among others.
 
 # Release Notes
-## 0.0.8 (TBD)
+## 0.0.8 (2024-08-20)
 - Add `round` method to the `RangeCollection` class for rounding to a select number of decimals and with a specified rounding factor.
 - Change `are_consecutive` `when_one` behavior to return a 1d array of the `when_one` value instead of the value itself.
 - Switch `RangeCollection` initialization to use default to `copy=None` to address necessary copy error with `numpy==2.x`. Also includes a fallback for `numpy==1.x` errors with optional copy behavior.
