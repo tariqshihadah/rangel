@@ -1751,7 +1751,7 @@ between 0 and {self.num_ranges - 1}.")
         """
         # Validate input
         if self.num_ranges == 1:
-            return when_one
+            return np.array([when_one])
         elif self.num_ranges == 0:
             raise ValueError("No ranges in collection.")
         
