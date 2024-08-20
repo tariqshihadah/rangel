@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rangel"
+version = "0.0.8"
+description = "Range data manipulations and operations"
+requires-python = ">=3.8"
+license = {file = "LICENSE.rst"}
+keywords=["python", "range", "numeric", "interval", "linear"]
+authors = [
+    {name = "Tariq Shihadah", email = "tariq.shihadah@gmail.com"}
+]
+dependencies = [
+    "numpy", 
+    "matplotlib", 
+    "scipy", 
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Unix",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+]
+dynamic = ["readme"]
+
+[project.urls]
+repository = "https://github.com/tariqshihadah/linref"
+
+[tool.setuptools.packages.find]
+include = ["rangel*"]
+exclude = ["rangel.tests*"]
+
+[tool.setuptools.dynamic]
+readme = {file = ["README.md"]}
