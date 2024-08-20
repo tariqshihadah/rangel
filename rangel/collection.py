@@ -129,8 +129,8 @@ class RangeCollection(object):
             begs = []
         if ends is None:
             ends = begs
-        begs = np.asarray(begs, dtype=float, copy=copy).flatten()
-        ends = np.asarray(ends, dtype=float, copy=copy).flatten()
+        begs = np.array(begs, dtype=float, copy=copy).flatten()
+        ends = np.array(ends, dtype=float, copy=copy).flatten()
         self._begs = begs.copy()
         self._ends = ends.copy()
         # Set centers
