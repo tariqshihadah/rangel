@@ -129,8 +129,13 @@ class RangeCollection(object):
             begs = []
         if ends is None:
             ends = begs
-        begs = np.array(begs, dtype=float, copy=copy).flatten()
-        ends = np.array(ends, dtype=float, copy=copy).flatten()
+        # Address copy parameter changes between numpy 1.x and 2.x
+        try:
+            begs = np.array(begs, dtype=float, copy=copy).flatten()
+            ends = np.array(ends, dtype=float, copy=copy).flatten()
+        except ValueError:
+            begs = np.array(begs, dtype=float, copy=True).flatten()
+            ends = np.array(ends, dtype=float, copy=True).flatten()
         self._begs = begs.copy()
         self._ends = ends.copy()
         # Set centers
