@@ -2096,23 +2096,20 @@ between 0 and {self.num_ranges - 1}.")
             Whether to perform the operation in place on the parent range
             collection, returning None.
         """
+        # Sort ranges to enforce monotony
         rng = np.sort(self.rng, axis=0)
-        
         if increasing:
-            begs = rng[0]
-            ends = rng[1]
+            begs, ends = rng[0], rng[1]
         else:
-            begs = rng[1]
-            ends = rng[0]
+            begs, ends = rng[1], rng[0]
         
         if inplace:
-            self._begs = begs
-            self._ends = ends
+            self._begs, self._ends = begs, ends
             self._monotonic = True
             return
         else:
-            rc = self.__class__(begs, ends, self._centers, copy=True,
-                                force_monotonic=False)
+            rc = self.__class__(
+                begs, ends, self._centers, copy=True, force_monotonic=False)
             rc._monotonic = True
             return rc
         
