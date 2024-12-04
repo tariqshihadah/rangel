@@ -1202,10 +1202,7 @@ of ranges in the collection.")
         deep : bool, default False
             Whether the created copy should be a deep copy.
         """
-        if deep:
-            return copy.deepcopy(self)
-        else:
-            return copy.copy(self)
+        return copy.deepcopy(self) if deep else copy.copy(self)
     
     def iterranges(self):
         """
