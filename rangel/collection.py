@@ -1135,21 +1135,17 @@ centers={self.center_type})"""
             Whether to perform the operation in place on the parent range
             collection, returning None.
         """
-        if closed in self._ops_closed:
-            if inplace:
-                self._closed = closed
-                self._closed_base = closed.replace('_mod','')
-                self._set_mod_locs()
-            else:
-                rc = self.copy()
-                rc._closed = closed
-                rc._closed_base = closed.replace('_mod','')
-                rc._set_mod_locs()
-                return rc
-        else:
+        # Validate input closed parameter
+        if not closed in self._ops_closed:
             raise ValueError(
                 "Collection's closed parameter must be one of "
                 f"{self._ops_closed}.")
+        # Apply changes
+        rc = self if inplace else self.copy()
+        rc._closed = closed
+        rc._closed_base = closed.replace('_mod','')
+        rc._set_mod_locs()
+        return None if inplace else rc
     
     def set_centers(self, centers=None, snap=False, inplace=False, copy=True):
         """
