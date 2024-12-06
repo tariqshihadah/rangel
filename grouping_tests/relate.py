@@ -41,9 +41,9 @@ def intersection_point_linear(left, right):
         # Get mask of modified edges to overwrite unmodified edges
         mask = right.modified_edges.reshape(1, -1)
         if right_closed_base == 'left':
-            np.equal(left_locs, right_ends, out=res, where=mask)
+            np.equal(left_locs, right_ends, out=res, where=mask & ~res)
         elif right_closed_base == 'right':
-            np.equal(left_locs, right_begs, out=res, where=mask)
+            np.equal(left_locs, right_begs, out=res, where=mask & ~res)
     
     return res
 
@@ -63,25 +63,24 @@ def intersection_linear_linear(left, right):
     np.greater(left_ends, right_begs, out=res)
     np.less(left_begs, right_ends, out=res, where=res)
 
-    # Identify modified edges if needed
-    if left.closed_mod:
-        left_mod = left.modified_edges.reshape(-1, 1)
-    if right.closed_mod:
-        right_mod = right.modified_edges.reshape(1, -1)
+    # Identify which edge cases need testing
+    test_edges = ~(
+        ((left.closed == 'neither') or (right.closed == 'neither')) or \
+        ((left.closed == 'left') and (right.closed == 'left')) or \
+        ((left.closed == 'right') and (right.closed == 'right'))
+    )
+    test_begs_ends = (left.closed != 'right') and (right.closed != 'left')
+    test_ends_begs = (left.closed != 'left') and (right.closed != 'right')
 
-    # Test all edge cases
-    #
-    #
-    #
-    #
-    # EXCLUDE CASES WHERE EITHER IS 'neither' OR FOR left and right_mod or similar
-    #
-    #
-    #
-    #
-    # - Test 1
-    if (left.closed in ['left', 'right_mod', 'both']) and \
-        (right.closed in ['right', 'left_mod', 'both']):
+    # Identify modified edges if needed
+    if test_edges:
+        if left.closed_mod:
+            left_mod = left.modified_edges.reshape(-1, 1)
+        if right.closed_mod:
+            right_mod = right.modified_edges.reshape(1, -1)
+
+    # - Test 1: left_begs == right_ends
+    if test_begs_ends and test_edges:
         # Create mask for where edge cases are relevant
         mask = ~res
         if left.closed == 'right_mod':
@@ -91,9 +90,8 @@ def intersection_linear_linear(left, right):
         # Apply test
         np.equal(left_begs, right_ends, out=res, where=mask)
 
-    # - Test 2
-    if (left.closed in ['right', 'left_mod', 'both']) and \
-        (right.closed in ['left', 'right_mod', 'both']):
+    # - Test 2: left_ends == right_begs
+    if test_ends_begs and test_edges:
         # Create mask for where edge cases are relevant
         mask = ~res
         if left.closed == 'left_mod':
