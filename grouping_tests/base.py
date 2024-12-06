@@ -21,23 +21,26 @@ def _method_require(**requirements):
         return wrapper
     return decorator
 
-def _prepare_data_array(data, name, ndim=1, dtype=None, **kwargs):
+def _prepare_data_array(data, name, ndim=1, dtype=None, copy=None):
     """
     Function for validating input data as a 1D scalar np.array using the given 
     name and optional dtype and copy arguments.
     """
     # Initialize data as a numpy array
     try:
-        data = np.array(data, dtype=dtype, **kwargs)
+        try:
+            data = np.asarray(data, dtype=dtype, copy=copy)
+        except TypeError: # numpy 1.X compatibility
+            data = np.array(data, dtype=dtype, copy=False)
         assert data.ndim == ndim
-    except:
+    except AssertionError:
         if dtype is None:
             raise ValueError(
                 f"Invalid input data for `{name}`. Must be a 1D array-like object."
             )
         else:
             raise ValueError(
-                f"Invalid input data for `{name}`. Must be a 1D array-like object with dtype={dtype}."
+                f"Invalid input data for `{name}`. Must be a 1D array-like object with dtype={dtype}. Provided array has shape={data.shape} and dtype={data.dtype}."
             )
     return data
 
@@ -64,7 +67,7 @@ class Rangel:
             ends=None, 
             closed=None, 
             dtype=float, 
-            copy=False,
+            copy=None,
             force_monotonic=True,
         ):
         # Validate inputs
@@ -683,7 +686,7 @@ class Rangel:
         pass
 
     @_method_require(is_monotonic=True)
-    def intersecting(self, other: Rangel):
+    def intersecting(self, other: Rangel, enforce_edges=True):
         """
         """
         # Validate input events
@@ -693,12 +696,16 @@ class Rangel:
         
         # Select intersection testing routine
         if self.is_point and other.is_point:
-            return intersection_point_point(self, other)
+            return intersection_point_point(
+                self, other, enforce_edges=enforce_edges)
         elif self.is_point and other.is_linear:
-            return intersection_point_linear(self, other)
+            return intersection_point_linear(
+                self, other, enforce_edges=enforce_edges)
         elif self.is_linear and other.is_point:
-            return intersection_point_linear(other, self).T
+            return intersection_point_linear(
+                other, self, enforce_edges=enforce_edges).T
         elif self.is_linear and other.is_linear:
-            return intersection_linear_linear(self, other)
+            return intersection_linear_linear(
+                self, other, enforce_edges=enforce_edges)
         else:
             raise ValueError("Invalid event types for intersection testing.")
