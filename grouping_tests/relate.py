@@ -1,3 +1,5 @@
+import numpy as np
+
 def intersection_point_point(left, right):
     """
     Identify intersections between two collections of point events.
@@ -7,7 +9,7 @@ def intersection_point_point(left, right):
     right_locs = right.locs.reshape(1, -1)
     
     # Test for intersection of locations
-    res = left_locs == right_locs
+    res = np.equal(left_locs, right_locs)
     return res
 
 def intersection_point_linear(left, right):
@@ -19,23 +21,25 @@ def intersection_point_linear(left, right):
     right_ends = right.ends.reshape(1, -1)
 
     # Initialize result array
-    res = np.empty((left_locs.shape[0], right_begs.shape[1]), dtype=bool)
+    res = np.zeros((left_locs.shape[0], right_begs.shape[1]), dtype=bool)
 
     # Test for intersection of locations
     right_closed_base = right.closed_base
+    # - Test 1
     if right_closed_base in ['left', 'both']:
         np.greater_equal(left_locs, right_begs, out=res)
     else:
         np.greater(left_locs, right_begs, out=res)
+    # - Test 2
     if right_closed_base in ['right', 'both']:
-        np.less_equal(left_locs, right_ends, out=res)
+        np.less_equal(left_locs, right_ends, out=res, where=res)
     else:
-        np.less(left_locs, right_ends, out=res)
+        np.less(left_locs, right_ends, out=res, where=res)
 
     # Test for modified edges
     if right.closed_mod:
         # Get mask of modified edges to overwrite unmodified edges
-        mask = right.modified_edges
+        mask = right.modified_edges.reshape(1, -1)
         if right_closed_base == 'left':
             np.equal(left_locs, right_ends, out=res, where=mask)
         elif right_closed_base == 'right':
@@ -46,4 +50,57 @@ def intersection_point_linear(left, right):
 def intersection_linear_linear(left, right):
     """
     """
-    pass
+    # Reshape arrays for broadcasting
+    left_begs = left.begs.reshape(-1, 1)
+    left_ends = left.ends.reshape(-1, 1)
+    right_begs = right.begs.reshape(1, -1)
+    right_ends = right.ends.reshape(1, -1)
+
+    # Initialize result array
+    res = np.zeros((left_begs.shape[0], right_begs.shape[1]), dtype=bool)
+
+    # Initialize result array with linear intersections
+    np.greater(left_ends, right_begs, out=res)
+    np.less(left_begs, right_ends, out=res, where=res)
+
+    # Identify modified edges if needed
+    if left.closed_mod:
+        left_mod = left.modified_edges.reshape(-1, 1)
+    if right.closed_mod:
+        right_mod = right.modified_edges.reshape(1, -1)
+
+    # Test all edge cases
+    #
+    #
+    #
+    #
+    # EXCLUDE CASES WHERE EITHER IS 'neither' OR FOR left and right_mod or similar
+    #
+    #
+    #
+    #
+    # - Test 1
+    if (left.closed in ['left', 'right_mod', 'both']) and \
+        (right.closed in ['right', 'left_mod', 'both']):
+        # Create mask for where edge cases are relevant
+        mask = ~res
+        if left.closed == 'right_mod':
+            np.logical_and(mask, left_mod, out=mask)
+        if right.closed == 'left_mod':
+            np.logical_and(mask, right_mod, out=mask)
+        # Apply test
+        np.equal(left_begs, right_ends, out=res, where=mask)
+
+    # - Test 2
+    if (left.closed in ['right', 'left_mod', 'both']) and \
+        (right.closed in ['left', 'right_mod', 'both']):
+        # Create mask for where edge cases are relevant
+        mask = ~res
+        if left.closed == 'left_mod':
+            np.logical_and(mask, left_mod, out=mask)
+        if right.closed == 'right_mod':
+            np.logical_and(mask, right_mod, out=mask)
+        # Apply test
+        np.equal(left_ends, right_begs, out=res, where=mask)
+
+    return res

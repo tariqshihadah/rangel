@@ -2,7 +2,7 @@ from __future__ import annotations
 import numpy as np
 import copy, hashlib
 
-from relate import intersection_point_point, intersection_point_linear
+from relate import intersection_point_point, intersection_point_linear, intersection_linear_linear
 
 def _method_require(**requirements):
     """
@@ -697,8 +697,8 @@ class Rangel:
         elif self.is_point and other.is_linear:
             return intersection_point_linear(self, other)
         elif self.is_linear and other.is_point:
-            pass
+            return intersection_point_linear(other, self).T
         elif self.is_linear and other.is_linear:
-            pass
+            return intersection_linear_linear(self, other)
         else:
             raise ValueError("Invalid event types for intersection testing.")
