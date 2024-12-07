@@ -1,0 +1,5 @@
+ipykernel
+numpy==1.26.1
+matplotlib
+scipy
+geopandas
