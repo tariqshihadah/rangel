@@ -65,7 +65,6 @@ def intersection_linear_linear(left, right, enforce_edges=True):
     np.less(left_begs, right_ends, out=step)
     res &= step
 
-
     # Test edges if necessary
     if enforce_edges:
         # Identify if edge cases need testing
