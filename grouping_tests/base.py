@@ -79,81 +79,7 @@ class Rangel:
         return text
     
     def __repr__(self):
-        # If no ranges present, return self as a string
-        if self.num_events == 0:
-            return str(self)
-        # Determine number of records to show
-        display_max = self._class_options['display_max']
-        if self.num_events > display_max:
-            # Define head/skip/tail selections
-            display_head = (display_max // 2) + (display_max % 2)
-            display_tail = (display_max // 2)
-            display_skip = self.num_events - display_max
-            # Define bool mask
-            display_select = np.array(
-                [True]  * display_head + 
-                [False] * display_skip + 
-                [True]  * display_tail)
-        else:
-            # Default head/skip/tail selections
-            display_head = self.num_events
-            display_tail = display_skip = 0
-            display_select = np.array([True] * self.num_events)
-        # Determine numbers of left and right digits to display
-        ld = len(str(int(self.arr[display_select].max())))
-        rd = 3
-        digits = ld + rd + 1
-        # Create formatter
-        records = []
-        closed = self.closed
-        if self.groups is not None:
-            max_len = max([len(x) for x in self.groups])
-            groups = np.array([f'group({x[:20]: >{min(max_len, 20)}}) ' for x in self.groups])
-        else:
-            groups = np.full(self.num_events, '')
-        # Define record string template and select features to display
-        if self.is_point:
-            display_features = {
-                'index': self.index[display_select],
-                'groups': groups[display_select],
-                'locs': self.locs[display_select],
-                'modified_edges': self.modified_edges[display_select],
-            }
-            record_template = '{index}, {groups}@ {locs: >{digits}.{rd}f}'
-        elif self.is_linear:
-            display_features = {
-                'index': self.index[display_select],
-                'groups': groups[display_select],
-                'begs': self.begs[display_select],
-                'ends': self.ends[display_select],
-                'modified_edges': self.modified_edges[display_select],
-            }
-            record_template = '{index}, {groups}{lb}{begs: >{digits}.{rd}f}, {ends: >{digits}.{rd}f}{rb}'
-            if self.is_located:
-                display_features['locs'] = self.locs[display_select]
-                record_template += ' @ {locs: >{digits}.{rd}f}'
-
-        # Iterate over selected features and create strings
-        for i in range(sum(display_select)):
-            params = {k: v[i] for k, v in display_features.items()}
-            record = record_template.format(
-                lb='[' if (closed in ['left','left_mod','both']) or params['modified_edges'] else '(',
-                rb=']' if (closed in ['right','right_mod','both']) or params['modified_edges'] else ')',
-                digits=digits, rd=rd, **params)
-            records.append(record)
-
-        # Create skipped record label if required
-        if display_skip > 0:
-            # Label skipped records
-            spacer_label = '{:,.0f} records'.format(display_skip)
-            # Format label
-            spaces = max(ld*2 + rd*2 + 6 - len(spacer_label), 6)
-            spacer = '.' * (spaces // 2) + spacer_label + \
-                '.' * (spaces // 2 + spaces % 2)
-            records = \
-                records[:display_head] + [spacer] + records[-display_tail:]
-        # Format full text string and return
-        return '\n'.join(records) + '\n' + str(self)
+        return utility._represent_records(self)
     
     def __getitem__(self, index):
         return self.select_index(index, ignore=False, inplace=False)
@@ -709,6 +635,17 @@ class Rangel:
     @utility._method_require(is_empty=False)
     def intersecting(self, other: Rangel, enforce_edges=True):
         """
+        Identify intersections between two collections of events.
+
+        Parameters
+        ----------
+        other : Rangel
+            The other collection of events to test for intersections.
+        enforce_edges : bool, default True
+            Whether to consider cases of coincident begin and end points, 
+            according to each collection's closed state. For instances where 
+            these cases are not relevant, set enforce_edges=False for improved 
+            performance.
         """
         # Validate input events
         if not isinstance(other, self.__class__):
