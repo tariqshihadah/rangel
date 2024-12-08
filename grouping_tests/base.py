@@ -519,22 +519,6 @@ class Rangel:
         rc._begs, rc._ends = begs, ends
         return None if inplace else rc
 
-    def sort_standard(self, inplace=False):
-        """
-        Sort the events by their positional information in the standard order
-        of 'groups', 'begs', 'ends' for linear events and 'groups', 'locs' 
-        for point events.
-        """
-        # Determine sorting parameters
-        if self.is_point:
-            by = ['groups', 'locs']
-        else:
-            by = ['groups', 'begs', 'ends']
-        ascending = [True for x in by]
-        
-        # Apply sorting
-        return self.sort(by, ascending=ascending, inplace=inplace)
-            
     def sort(self, by, ascending=True, inplace=False):
         f"""
         Sort the events by a selected event data anchor.
@@ -582,6 +566,22 @@ class Rangel:
         rc = rc.select_index(index, ignore=True, inplace=False)
         return None if inplace else rc
     
+    def sort_standard(self, inplace=False):
+        """
+        Sort the events by their positional information in the standard order
+        of 'groups', 'begs', 'ends' for linear events and 'groups', 'locs' 
+        for point events.
+        """
+        # Determine sorting parameters
+        if self.is_point:
+            by = ['groups', 'locs']
+        else:
+            by = ['groups', 'begs', 'ends']
+        ascending = [True for x in by]
+        
+        # Apply sorting
+        return self.sort(by, ascending=ascending, inplace=inplace)
+            
     def next_overlapping(self, all_=True, when_one=True, enforce_edges=False):
         """
         Whether all or any ranges are overlapping the next range in the 
