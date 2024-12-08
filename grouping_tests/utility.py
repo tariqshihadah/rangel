@@ -41,6 +41,29 @@ def _prepare_data_array(data, name, ndim=1, dtype=None, copy=None):
             )
     return data
 
+def _stringify_instance(rng):
+    # Determine event type
+    typologies = []
+    typologies.append('grouped' if rng.is_grouped else 'ungrouped')
+    if rng.is_point:
+        typologies.append('point')
+    else:
+        if rng.is_located:
+            typologies.append('located')
+        typologies.append('linear')
+        if rng.is_monotonic:
+            typologies.append('monotonic')
+    event_type = ' '.join(typologies)
+
+    # Set closed string
+    closed = f", closed={rng.closed}" if rng.is_linear else ''
+
+    # Create text string
+    text = (
+        f"{rng.__class__.__name__}({rng.num_events:,.0f} {event_type} events{closed})"
+    )
+    return text
+
 def _represent_records(rng):
     """
     Create a string representation of a Rangel instance, displaying only the 

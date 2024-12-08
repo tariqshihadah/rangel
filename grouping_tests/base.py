@@ -56,27 +56,7 @@ class Rangel:
             index=index, groups=groups, locs=locs, begs=begs, ends=ends, **kwargs)
 
     def __str__(self):
-        # Determine event type
-        typologies = []
-        typologies.append('grouped' if self.is_grouped else 'ungrouped')
-        if self.is_point:
-            typologies.append('point')
-        else:
-            if self.is_located:
-                typologies.append('located')
-            typologies.append('linear')
-            if self.is_monotonic:
-                typologies.append('monotonic')
-        event_type = ' '.join(typologies)
-
-        # Set closed string
-        closed = f", closed={self.closed}" if self.is_linear else ''
-
-        # Create text string
-        text = (
-            f"{self.__class__.__name__}({self.num_events:,.0f} {event_type} events{closed})"
-        )
-        return text
+        return utility._stringify_instance(self)
     
     def __repr__(self):
         return utility._represent_records(self)
