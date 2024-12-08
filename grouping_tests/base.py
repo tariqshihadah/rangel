@@ -555,8 +555,8 @@ class Rangel:
                 "Input 'ascending' parameter must be single boolean "
                 "value or must be list of same length as 'by'.")
         
-        # Get the arrays for lexsort
-        ascending = [1 if x else -1 for x in ascending[::-1]] # Reverse order per numpy lexsort
+        # Get the arrays for lexsort (reverse order per numpy lexsort)
+        ascending = [1 if x else -1 for x in ascending[::-1]]
         by = [ascending[i] * getattr(self, x) for i, x in enumerate(by[::-1])]
         # Apply sorting
         index = np.lexsort(by)

@@ -190,7 +190,8 @@ def intersection_linear_linear(left, right, enforce_edges=True):
                     np.logical_and(mask, right_mod, out=mask)
                 # Apply test
                 np.equal(left_begs, right_ends, out=step)
-                res |= step & mask
+                np.logical_and(step, mask, out=step)
+                np.logical_or(res, step, out=res)
 
             # - Test 2: left_ends == right_begs
             np.invert(res, out=mask)
@@ -201,8 +202,9 @@ def intersection_linear_linear(left, right, enforce_edges=True):
                 if right.closed == 'right_mod':
                     np.logical_and(mask, right_mod, out=mask)
                 # Apply test
-                np.equal(left_ends, right_begs, out=res)
-                res |= step & mask
+                np.equal(left_ends, right_begs, out=step)
+                np.logical_and(step, mask, out=step)
+                np.logical_or(res, step, out=res)
 
     # Apply group masking if necessary
     if left.is_grouped:
