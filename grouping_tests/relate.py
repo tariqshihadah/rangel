@@ -1,8 +1,52 @@
 import numpy as np
 import base
 
-def test():
-    print(base.__dict__)
+def overlay(left, right, normalize=True, how='right'):
+    """
+    Compute the overlay of two collections of events.
+
+    Parameters
+    ----------
+    left, right : Rangel
+        Input Rangel instances to overlay.
+    normalize : bool, default True
+        Whether overlapping lengths should be normalized to give a 
+        proportional result with a float value between 0 and 1.
+    how : str, default 'right'
+        How overlapping lengths should be normalized. Only applied if
+        `normalize` is True.
+        - 'right' : Normalize by the length of the right events.
+        - 'left' : Normalize by the length of the left events.
+    """
+    _how_options = {'right', 'left'}
+    
+    # Validate inputs
+    if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
+        raise TypeError("Input objects must be Rangel class instances.")
+    
+    # Compute overlap lengths
+    lefts = left.ends.reshape(-1, 1) - right.begs.reshape(1, -1)
+    rights = right.ends.reshape(-1, 1) - left.begs.reshape(1, -1)
+
+    # Compare against event lengths
+    overlay = np.stack([lefts, rights, left.lengths, right.lengths], axis=0)
+    overlay = np.nanmin(overlay, axis=0).clip(0)
+
+    # Normalize if necessary
+    if normalize:
+        # Get denominator
+        if how == 'right':
+            denom = right.lengths.reshape(1, -1)
+        elif how == 'left':
+            denom = left.lengths.reshape(-1, 1)
+        else:
+            raise ValueError(
+                f"Invalid 'how' parameter value provided ({how}). Must be one "
+                f"of {_how_options}.")
+        # Normalize
+        overlay = overlay / np.where(denom==0, np.inf, denom)
+
+    return overlay
 
 def intersection_point_point(left, right):
     """
@@ -22,6 +66,8 @@ def intersection_point_point(left, right):
 
 def intersection_point_linear(left, right, enforce_edges=True):
     """
+    Identify intersections between a collection of point events and a collection 
+    of linear events.
     """
     # Reshape arrays for broadcasting
     left_locs = left.locs.reshape(-1, 1)
@@ -57,6 +103,7 @@ def intersection_point_linear(left, right, enforce_edges=True):
 
 def intersection_linear_linear(left, right, enforce_edges=True):
     """
+    Identify intersections between two collections of linear events.
     """
     # Reshape arrays for broadcasting
     left_begs = left.begs.reshape(-1, 1)

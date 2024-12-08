@@ -612,6 +612,21 @@ class Rangel:
     def resegment(self):
         pass
 
+    @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
+    def overlay(self, other: Rangel):
+        """
+        """
+        # Validate input events
+        if not isinstance(other, self.__class__):
+            raise ValueError(
+                f"Input events must be {self.__class__.__name__} class instance.")
+        if not other.is_linear or not other.is_monotonic:
+            raise ValueError(
+                "Input events must be linear and monotonic.")
+        
+        # Perform overlay
+        return relate.overlay(self, other)
+
     @utility._method_require(is_empty=False)
     def intersecting(self, other: Rangel, enforce_edges=True):
         """
