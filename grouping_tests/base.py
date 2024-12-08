@@ -251,6 +251,16 @@ class Rangel:
                     edges = np.zeros(self.begs.shape, dtype=bool)
         return edges
 
+    @property
+    def unique_groups(self):
+        """
+        Get unique group values.
+        """
+        if self.is_grouped:
+            return np.unique(self.groups)
+        else:
+            return None
+
     def _validate_index(self, index):
         """
         Validate input index as a 1D scalar np.array.
@@ -390,6 +400,7 @@ class Rangel:
             if not ignore:
                 sorter = np.argsort(self._index)
                 index = np.searchsorted(self._index[sorter], index)
+
         # Apply selection
         rc = self if inplace else self.copy()
         try:
@@ -401,6 +412,49 @@ class Rangel:
         except:
             raise ValueError(
                 "Invalid index selection. Check that the index values are within bounds.")
+        return None if inplace else rc
+
+    def select_group(self, group, ungroup=None, inplace=False):
+        """
+        Select events by group.
+
+        Parameters
+        ----------
+        group : label
+            The label of the group to select or array-like of the same.
+        ungroup : bool, default None
+            Whether to ungroup the selection, returning the selected events 
+            without their group labels. If None and a single group is selected,
+            the result will be ungrouped otherwise the group labels will be
+            retained.
+        """
+        # Validate input group
+        if not self.is_grouped:
+            raise ValueError("No groups in collection.")
+        if isinstance(group, (list, np.ndarray)):
+            select_multiple = True
+            ungroup = False if ungroup is None else ungroup
+            if not all([x in self.unique_groups for x in group]):
+                raise KeyError("Input groups not found in collection.")
+        else:
+            select_multiple = False
+            if not group in self.unique_groups:
+                raise KeyError("Input group not found in collection.")
+        
+        # Identify group indices
+        if select_multiple:
+            index = np.isin(self.groups, group)
+        else:
+            index = np.where(self.groups == group)[0]
+
+        # Apply selection
+        rc = self if inplace else self.copy()
+        rc = rc.select_index(index, ignore=True, inplace=False)
+
+        # Ungroup selection if necessary
+        if ungroup:
+            rc._groups = None
+
         return None if inplace else rc
     
     def set_closed(self, closed=None, inplace=False):
@@ -586,6 +640,18 @@ class Rangel:
         res = np.zeros(self.num_events, dtype=int)
         res[1:] = np.cumsum(~self.next_consecutive(all_=False))
         return res
+
+    def iter_groups(self):
+        """
+        Iterate over the groups in the collection.
+        """
+        # Validate input
+        if not self.is_grouped:
+            raise ValueError("No groups in collection.")
+        
+        # Iterate over groups
+        for group in self.unique_groups:
+            yield self.select_group(group, inplace=False)
         
     @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
     def separate(self):
