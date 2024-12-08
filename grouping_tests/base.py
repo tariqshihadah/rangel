@@ -14,6 +14,7 @@ class Rangel:
     _class_options = dict(
         display_max = 10,
         default_closed = 'right',
+        keys_all={'index', 'groups', 'locs', 'begs', 'ends', 'centers'},
         anchors_all={'locs', 'begs', 'ends', 'centers'},
         anchors_locs={'begs', 'ends', 'centers'},
         closed = {'left','left_mod','right','right_mod','both','neither'},
@@ -432,12 +433,15 @@ class Rangel:
         if not self.is_grouped:
             raise ValueError("No groups in collection.")
         if isinstance(group, (list, np.ndarray)):
+            # Multiple group selection
             select_multiple = True
             ungroup = False if ungroup is None else ungroup
             if not all([x in self.unique_groups for x in group]):
                 raise KeyError("Input groups not found in collection.")
         else:
+            # Single group selection
             select_multiple = False
+            ungroup = True if ungroup is None else ungroup
             if not group in self.unique_groups:
                 raise KeyError("Input group not found in collection.")
         
@@ -445,7 +449,7 @@ class Rangel:
         if select_multiple:
             index = np.isin(self.groups, group)
         else:
-            index = np.where(self.groups == group)[0]
+            index = np.equal(self.groups, group)
 
         # Apply selection
         rc = self if inplace else self.copy()
@@ -486,6 +490,15 @@ class Rangel:
         rc._closed = closed
         rc._closed_base = closed.replace('_mod','')
         return None if inplace else rc
+
+    def ungroup(self, inplace=False):
+        """
+        Remove group labels from the collection.
+        """
+        # Apply changes
+        rc = self if inplace else self.copy()
+        rc._groups = None
+        return None if inplace else rc
     
     @utility._method_require(is_linear=True)
     def set_monotonic(self, inplace=False, **kwargs):
@@ -505,14 +518,30 @@ class Rangel:
         rc = self if inplace else self.copy()
         rc._begs, rc._ends = begs, ends
         return None if inplace else rc
-            
-    def sort(self, by='begs', ascending=True, inplace=False):
+
+    def sort_standard(self, inplace=False):
         """
+        Sort the events by their positional information in the standard order
+        of 'groups', 'begs', 'ends' for linear events and 'groups', 'locs' 
+        for point events.
+        """
+        # Determine sorting parameters
+        if self.is_point:
+            by = ['groups', 'locs']
+        else:
+            by = ['groups', 'begs', 'ends']
+        ascending = [True for x in by]
+        
+        # Apply sorting
+        return self.sort(by, ascending=ascending, inplace=inplace)
+            
+    def sort(self, by, ascending=True, inplace=False):
+        f"""
         Sort the events by a selected event data anchor.
         
         Parameters
         ----------
-        by : {'locs', 'begs', 'ends', 'centers'}, default 'begs'
+        by : {self._class_options['keys_all']}
             The event data property or list of properties by which all events 
             should be sorted.
         ascending : boolean, default True
@@ -525,10 +554,10 @@ class Rangel:
         # Determine sorting parameters
         if not type(by) is list:
             by = [by]
-        if not set(by).issubset(self._class_options['anchors_all']):
+        if not set(by).issubset(self._class_options['keys_all']):
             raise ValueError(
                 "Input 'by' parameter must be one or more of "
-                f"{self._class_options['anchors_all']}.")
+                f"{self._class_options['keys_all']}.")
         if self.is_point and ('begs' in by or 'ends' in by):
             raise ValueError(
                 "Sorting by 'begs' or 'ends' is not available for point events.")
@@ -641,17 +670,26 @@ class Rangel:
         res[1:] = np.cumsum(~self.next_consecutive(all_=False))
         return res
 
-    def iter_groups(self):
+    def iter_groups(self, ungroup=True):
         """
         Iterate over the groups in the collection.
         """
         # Validate input
         if not self.is_grouped:
             raise ValueError("No groups in collection.")
+
+        # Get group indices with groupby routine
+        sorted_rng = self.sort_standard(inplace=False)
+        unique_groups, splitter_i = np.unique(sorted_rng.groups, return_index=True)
+        splitter_j = np.append(splitter_i[1:], len(sorted_rng.groups))
         
         # Iterate over groups
-        for group in self.unique_groups:
-            yield self.select_group(group, inplace=False)
+        for group, i, j in zip(unique_groups, splitter_i, splitter_j):
+            rng = sorted_rng.select_index(slice(i, j), inplace=False)
+            # Ungroup if necessary
+            if ungroup:
+                rng = rng.ungroup()
+            yield group, rng
         
     @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
     def separate(self):
