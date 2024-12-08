@@ -1,7 +1,7 @@
 import numpy as np
 import base
 
-def overlay(left, right, normalize=True, how='right'):
+def overlay(left, right, normalize=True, norm_by='right'):
     """
     Compute the overlay of two collections of events.
 
@@ -12,41 +12,55 @@ def overlay(left, right, normalize=True, how='right'):
     normalize : bool, default True
         Whether overlapping lengths should be normalized to give a 
         proportional result with a float value between 0 and 1.
-    how : str, default 'right'
+    norm_by : str, default 'right'
         How overlapping lengths should be normalized. Only applied if
         `normalize` is True.
         - 'right' : Normalize by the length of the right events.
         - 'left' : Normalize by the length of the left events.
     """
-    _how_options = {'right', 'left'}
+    _norm_by_options = {'right', 'left'}
     
     # Validate inputs
     if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
         raise TypeError("Input objects must be Rangel class instances.")
-    
+    if left.is_grouped != right.is_grouped:
+        raise ValueError("Input objects must have the same grouping status.")
+
     # Compute overlap lengths
     lefts = left.ends.reshape(-1, 1) - right.begs.reshape(1, -1)
-    rights = right.ends.reshape(-1, 1) - left.begs.reshape(1, -1)
+    rights = right.ends.reshape(1, -1) - left.begs.reshape(-1, 1)
 
     # Compare against event lengths
-    overlay = np.stack([lefts, rights, left.lengths, right.lengths], axis=0)
-    overlay = np.nanmin(overlay, axis=0).clip(0)
+    overlap = np.minimum(lefts, rights)
+    lengths = np.minimum(
+        left.lengths.reshape(-1, 1),
+        right.lengths.reshape(1, -1)
+    )
+    np.minimum(overlap, lengths, out=overlap)
+    np.clip(overlap, 0, None, out=overlap)
 
     # Normalize if necessary
     if normalize:
         # Get denominator
-        if how == 'right':
+        if norm_by == 'right':
             denom = right.lengths.reshape(1, -1)
-        elif how == 'left':
+        elif norm_by == 'left':
             denom = left.lengths.reshape(-1, 1)
         else:
             raise ValueError(
-                f"Invalid 'how' parameter value provided ({how}). Must be one "
-                f"of {_how_options}.")
+                f"Invalid 'norm_by' parameter value provided ({norm_by}). Must be one "
+                f"of {_norm_by_options}.")
         # Normalize
-        overlay = overlay / np.where(denom==0, np.inf, denom)
+        denom = np.where(denom==0, np.inf, denom)
+        np.divide(overlap, denom, out=overlap)
 
-    return overlay
+    # Apply group masking if necessary
+    if left.is_grouped:
+        # Identify matching groups
+        mask = np.equal(left.groups.reshape(-1, 1), right.groups.reshape(1, -1))
+        np.multiply(overlap, mask, out=overlap)
+    
+    return overlap
 
 def intersection_point_point(left, right):
     """
@@ -55,6 +69,8 @@ def intersection_point_point(left, right):
     # Validate inputs
     if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
         raise TypeError("Input objects must be Rangel class instances.")
+    if left.is_grouped != right.is_grouped:
+        raise ValueError("Input objects must have the same grouping status.")
 
     # Reshape arrays for broadcasting
     left_locs = left.locs.reshape(-1, 1)
@@ -62,6 +78,13 @@ def intersection_point_point(left, right):
     
     # Test for intersection of locations
     res = np.equal(left_locs, right_locs)
+
+    # Apply group masking if necessary
+    if left.is_grouped:
+        # Identify matching groups
+        mask = np.equal(left.groups.reshape(-1, 1), right.groups.reshape(1, -1))
+        np.logical_and(res, mask, out=res)
+    
     return res
 
 def intersection_point_linear(left, right, enforce_edges=True):
@@ -69,6 +92,12 @@ def intersection_point_linear(left, right, enforce_edges=True):
     Identify intersections between a collection of point events and a collection 
     of linear events.
     """
+    # Validate inputs
+    if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
+        raise TypeError("Input objects must be Rangel class instances.")
+    if left.is_grouped != right.is_grouped:
+        raise ValueError("Input objects must have the same grouping status.")
+
     # Reshape arrays for broadcasting
     left_locs = left.locs.reshape(-1, 1)
     right_begs = right.begs.reshape(1, -1)
@@ -99,12 +128,24 @@ def intersection_point_linear(left, right, enforce_edges=True):
         elif right_closed_base == 'right':
             np.equal(left_locs, right_begs, out=res, where=mask & ~res)
     
+    # Apply group masking if necessary
+    if left.is_grouped:
+        # Identify matching groups
+        np.equal(left.groups.reshape(-1, 1), right.groups.reshape(1, -1), out=mask)
+        np.logical_and(res, mask, out=res)
+    
     return res
 
 def intersection_linear_linear(left, right, enforce_edges=True):
     """
     Identify intersections between two collections of linear events.
     """
+    # Validate inputs
+    if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
+        raise TypeError("Input objects must be Rangel class instances.")
+    if left.is_grouped != right.is_grouped:
+        raise ValueError("Input objects must have the same grouping status.")
+
     # Reshape arrays for broadcasting
     left_begs = left.begs.reshape(-1, 1)
     left_ends = left.ends.reshape(-1, 1)
@@ -163,4 +204,10 @@ def intersection_linear_linear(left, right, enforce_edges=True):
                 np.equal(left_ends, right_begs, out=res)
                 res |= step & mask
 
+    # Apply group masking if necessary
+    if left.is_grouped:
+        # Identify matching groups
+        np.equal(left.groups.reshape(-1, 1), right.groups.reshape(1, -1), out=mask)
+        np.logical_and(res, mask, out=res)
+    
     return res

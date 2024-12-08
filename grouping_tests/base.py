@@ -613,8 +613,22 @@ class Rangel:
         pass
 
     @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
-    def overlay(self, other: Rangel):
+    def overlay(self, other: Rangel, normalize=True, norm_by='right'):
         """
+        Compute the overlay of two collections of events.
+
+        Parameters
+        ----------
+        left, right : Rangel
+            Input Rangel instances to overlay.
+        normalize : bool, default True
+            Whether overlapping lengths should be normalized to give a 
+            proportional result with a float value between 0 and 1.
+        norm_by : str, default 'right'
+            How overlapping lengths should be normalized. Only applied if
+            `normalize` is True.
+            - 'right' : Normalize by the length of the right events.
+            - 'left' : Normalize by the length of the left events.
         """
         # Validate input events
         if not isinstance(other, self.__class__):
@@ -625,7 +639,7 @@ class Rangel:
                 "Input events must be linear and monotonic.")
         
         # Perform overlay
-        return relate.overlay(self, other)
+        return relate.overlay(self, other, normalize=normalize, norm_by=norm_by)
 
     @utility._method_require(is_empty=False)
     def intersecting(self, other: Rangel, enforce_edges=True):
