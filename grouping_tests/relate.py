@@ -1,9 +1,17 @@
 import numpy as np
+import base
+
+def test():
+    print(base.__dict__)
 
 def intersection_point_point(left, right):
     """
     Identify intersections between two collections of point events.
     """
+    # Validate inputs
+    if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
+        raise TypeError("Input objects must be Rangel class instances.")
+
     # Reshape arrays for broadcasting
     left_locs = left.locs.reshape(-1, 1)
     right_locs = right.locs.reshape(1, -1)

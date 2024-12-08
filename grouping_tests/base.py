@@ -2,47 +2,9 @@ from __future__ import annotations
 import numpy as np
 import copy, hashlib
 
-from relate import intersection_point_point, intersection_point_linear, intersection_linear_linear
+# Import helper modules
+import utility, relate, modify
 
-def _method_require(**requirements):
-    """
-    Callable decorator to require that a class meets certain attribute or 
-    property requirements.
-    """
-    def decorator(func):
-        def wrapper(self, *args, **kwargs):
-            for key, value in requirements.items():
-                if getattr(self, key) != value:
-                    raise ValueError(
-                        f"The {func.__name__} method is only available "
-                        f"for {self.__class__.__name__} instances with {key}={value}."
-                    )
-            return func(self, *args, **kwargs)
-        return wrapper
-    return decorator
-
-def _prepare_data_array(data, name, ndim=1, dtype=None, copy=None):
-    """
-    Function for validating input data as a 1D scalar np.array using the given 
-    name and optional dtype and copy arguments.
-    """
-    # Initialize data as a numpy array
-    try:
-        try:
-            data = np.asarray(data, dtype=dtype, copy=copy)
-        except TypeError: # numpy 1.X compatibility
-            data = np.array(data, dtype=dtype, copy=False)
-        assert data.ndim == ndim
-    except AssertionError:
-        if dtype is None:
-            raise ValueError(
-                f"Invalid input data for `{name}`. Must be a 1D array-like object."
-            )
-        else:
-            raise ValueError(
-                f"Invalid input data for `{name}`. Must be a 1D array-like object with dtype={dtype}. Provided array has shape={data.shape} and dtype={data.dtype}."
-            )
-    return data
 
 class Rangel:
     """
@@ -73,9 +35,25 @@ class Rangel:
         # Validate inputs
         self._validate_data(index, groups, locs, begs, ends, dtype=dtype, copy=copy)
         self.set_closed(closed, inplace=True)
+        self._dtype = dtype
         # Prepare data
         if force_monotonic and self.is_linear:
             self.set_monotonic(inplace=True)
+
+    def from_similar(self, index=None, groups=None, locs=None, begs=None, ends=None, **kwargs):
+        """
+        Create a new instance of the class with similar properties to the 
+        current instance.
+        """
+        # Populate kwargs
+        kwargs = {
+            'closed': self.closed,
+            'dtype': self._dtype,
+            **kwargs
+        }
+        # Create new instance
+        return self.__class__(
+            index=index, groups=groups, locs=locs, begs=begs, ends=ends, **kwargs)
 
     def __str__(self):
         # Determine event type
@@ -129,7 +107,8 @@ class Rangel:
         records = []
         closed = self.closed
         if self.groups is not None:
-            groups = np.array([f'group({x}) ' for x in self.groups])
+            max_len = max([len(x) for x in self.groups])
+            groups = np.array([f'group({x[:20]: >{min(max_len, 20)}}) ' for x in self.groups])
         else:
             groups = np.full(self.num_events, '')
         # Define record string template and select features to display
@@ -330,6 +309,13 @@ class Rangel:
             return True
         
     @property
+    def is_empty(self):
+        """
+        Whether the collection is empty.
+        """
+        return self.num_events == 0
+        
+    @property
     def modified_edges(self):
         """
         Get indexes of ranges with modified edges. Only applicable when 
@@ -364,9 +350,14 @@ class Rangel:
         Validate input index as a 1D scalar np.array.
         """
         if index is None:
+            # Create a generic zero-based integer index
             index = np.arange(self.num_events, dtype=int)
         else:
-            index = _prepare_data_array(index, 'index')
+            index = utility._prepare_data_array(index, 'index')
+            # Check that all indices are unique
+            if len(np.unique(index)) < len(index):
+                raise ValueError(
+                    "All input indices must be unique.")
         return index
     
     def _validate_groups(self, groups):
@@ -376,7 +367,7 @@ class Rangel:
         if groups is None:
             pass
         else:
-            groups = _prepare_data_array(groups, 'groups')
+            groups = utility._prepare_data_array(groups, 'groups')
         return groups
     
     def _validate_data(self, index, groups, locs, begs, ends, dtype=None, copy=None):
@@ -395,7 +386,7 @@ class Rangel:
                     "For located point events, `locs` must be a 1D scalar array-like object."
                 )
             # Convert locs to a numpy array
-            locs = _prepare_data_array(locs, 'locs')
+            locs = utility._prepare_data_array(locs, 'locs')
             data_arrays['locs'] = locs
 
         # - Located linear events
@@ -408,16 +399,16 @@ class Rangel:
                     )
             # Convert data to numpy arrays
             else:
-                locs = _prepare_data_array(locs, 'locs', dtype=dtype, copy=copy)
+                locs = utility._prepare_data_array(locs, 'locs', dtype=dtype, copy=copy)
                 data_arrays['locs'] = locs
-            begs = _prepare_data_array(begs, 'begs', dtype=dtype, copy=copy)
-            ends = _prepare_data_array(ends, 'ends', dtype=dtype, copy=copy)
+            begs = utility._prepare_data_array(begs, 'begs', dtype=dtype, copy=copy)
+            ends = utility._prepare_data_array(ends, 'ends', dtype=dtype, copy=copy)
             data_arrays['begs'] = begs; data_arrays['ends'] = ends
 
         # - Unlocated linear events
         elif data_input_case == (False, True, True):
-            begs = _prepare_data_array(begs, 'begs', dtype=dtype, copy=copy)
-            ends = _prepare_data_array(ends, 'ends', dtype=dtype, copy=copy)
+            begs = utility._prepare_data_array(begs, 'begs', dtype=dtype, copy=copy)
+            ends = utility._prepare_data_array(ends, 'ends', dtype=dtype, copy=copy)
             data_arrays['begs'] = begs; data_arrays['ends'] = ends
         
         # - Invalid input data case
@@ -536,7 +527,7 @@ class Rangel:
         rc._closed_base = closed.replace('_mod','')
         return None if inplace else rc
     
-    @_method_require(is_linear=True)
+    @utility._method_require(is_linear=True)
     def set_monotonic(self, inplace=False, **kwargs):
         """
         Arrange begin and end positions so that all ranges are increasing.
@@ -640,10 +631,10 @@ class Rangel:
         else:
             return res
 
-    def next_consecutive(self, all_=True, when_one=True, sort=False):
+    def next_consecutive(self, all_=True, when_one=True):
         """
         Whether all or any ranges are consecutive with the next range in the 
-        collection.
+        collection, i.e. the end of one range is the beginning of the next.
 
         Parameters
         ----------
@@ -673,19 +664,49 @@ class Rangel:
         else:
             return res
         
-    @_method_require(is_linear=True, is_monotonic=True)
+    def consecutive_strings(self):
+        """
+        Identify strings of consecutive events in the collection, returning 
+        an array of integers indicating which consecutive string each event 
+        belongs to.
+        """
+        # Validate input
+        if self.num_events == 0:
+            raise ValueError("No ranges in collection.")
+        elif self.num_events == 1:
+            return np.array([0])
+        
+        # Identify consecutive strings
+        res = np.zeros(self.num_events, dtype=int)
+        res[1:] = np.cumsum(~self.next_consecutive(all_=False))
+        return res
+        
+    @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
     def separate(self):
         pass
 
-    @_method_require(is_linear=True, is_monotonic=True)
-    def dissolve(self):
-        pass
+    @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
+    def dissolve(self, keep_index=False, return_index=False):
+        """
+        Dissolve consecutive linear events into single events. For best 
+        results, input events should be sorted.
 
-    @_method_require(is_linear=True, is_monotonic=True)
+        Parameters
+        ----------
+        keep_index : bool or {'first', 'last'}, default False
+            Whether to keep the index of the first or last event in each  
+            dissolved event. If False, a new index will be created.
+        return_index : bool, default False
+            Whether to return a list of arrays indicating the indices of the 
+            original events which were dissolved into each new event.
+        """
+        return modify.dissolve(self, return_index=return_index)
+
+    @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
     def resegment(self):
         pass
 
-    @_method_require(is_monotonic=True)
+    @utility._method_require(is_empty=False)
     def intersecting(self, other: Rangel, enforce_edges=True):
         """
         """
@@ -696,16 +717,17 @@ class Rangel:
         
         # Select intersection testing routine
         if self.is_point and other.is_point:
-            return intersection_point_point(
+            return relate.intersection_point_point(
                 self, other, enforce_edges=enforce_edges)
         elif self.is_point and other.is_linear:
-            return intersection_point_linear(
+            return relate.intersection_point_linear(
                 self, other, enforce_edges=enforce_edges)
         elif self.is_linear and other.is_point:
-            return intersection_point_linear(
+            return relate.intersection_point_linear(
                 other, self, enforce_edges=enforce_edges).T
         elif self.is_linear and other.is_linear:
-            return intersection_linear_linear(
+            return relate.intersection_linear_linear(
                 self, other, enforce_edges=enforce_edges)
         else:
             raise ValueError("Invalid event types for intersection testing.")
+    
