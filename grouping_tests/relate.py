@@ -54,8 +54,10 @@ def _chunked_operation_wrapper(func):
             if chunksize < 1:
                 raise ValueError("The 'chunksize' parameter must be greater than 0.")
         else:
-            # If no chunksize provided, enforce a single chunk
-            chunksize = max(left.num_events, right.num_events)
+            # If no chunksize provided, skip chunking altogether
+            chunk = func(left, right, *args, **kwargs)
+            res = sp.coo_array(chunk)
+            return res
         
         # Iterate over chunks
         left_arrays = []
@@ -78,7 +80,7 @@ def _chunked_operation_wrapper(func):
 
 @_grouped_operation_wrapper
 @_chunked_operation_wrapper
-def overlay(left, right, normalize=True, norm_by='right', chunksize=1000):
+def overlay(left, right, normalize=True, norm_by='right', chunksize=None):
     """
     Compute the overlay of two collections of events.
 
@@ -94,7 +96,7 @@ def overlay(left, right, normalize=True, norm_by='right', chunksize=1000):
         `normalize` is True.
         - 'right' : Normalize by the length of the right events.
         - 'left' : Normalize by the length of the left events.
-    chunksize : int or None, default 1000
+    chunksize : int or None, default None
         The maximum number of elements to process in a single chunk.
         Input chunksize will affect the memory usage and performance of
         the function.
@@ -137,8 +139,9 @@ def overlay(left, right, normalize=True, norm_by='right', chunksize=1000):
     
     return overlap
 
+@_grouped_operation_wrapper
 @_chunked_operation_wrapper
-def intersection_point_point(left, right, chunksize=1000):
+def intersection_point_point(left, right, chunksize=None):
     """
     Identify intersections between two collections of point events.
     """
@@ -163,8 +166,9 @@ def intersection_point_point(left, right, chunksize=1000):
     
     return res
 
+@_grouped_operation_wrapper
 @_chunked_operation_wrapper
-def intersection_point_linear(left, right, enforce_edges=True, chunksize=1000):
+def intersection_point_linear(left, right, enforce_edges=True, chunksize=None):
     """
     Identify intersections between a collection of point events and a collection 
     of linear events.
@@ -213,8 +217,9 @@ def intersection_point_linear(left, right, enforce_edges=True, chunksize=1000):
     
     return res
 
+@_grouped_operation_wrapper
 @_chunked_operation_wrapper
-def intersection_linear_linear(left, right, enforce_edges=True, chunksize=1000):
+def intersection_linear_linear(left, right, enforce_edges=True, chunksize=None):
     """
     Identify intersections between two collections of linear events.
     """
