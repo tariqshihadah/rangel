@@ -1,6 +1,7 @@
 from __future__ import annotations
 import numpy as np
 import copy, hashlib
+from scipy import sparse as sp
 
 # Import helper modules
 import utility, relate, modify
@@ -717,7 +718,7 @@ class Rangel:
         pass
 
     @utility._method_require(is_linear=True, is_monotonic=True, is_empty=False)
-    def overlay(self, other: Rangel, normalize=True, norm_by='right'):
+    def overlay(self, other: Rangel, normalize=True, norm_by='right', chunksize=1000):
         """
         Compute the overlay of two collections of events.
 
@@ -733,6 +734,10 @@ class Rangel:
             `normalize` is True.
             - 'right' : Normalize by the length of the right events.
             - 'left' : Normalize by the length of the left events.
+        chunksize : int or None, default 1000
+            The maximum number of events to process in a single chunk.
+            Input chunksize will affect the memory usage and performance of
+            the function.
         """
         # Validate input events
         if not isinstance(other, self.__class__):
@@ -743,10 +748,16 @@ class Rangel:
                 "Input events must be linear and monotonic.")
         
         # Perform overlay
-        return relate.overlay(self, other, normalize=normalize, norm_by=norm_by)
+        return relate.overlay(
+            self,
+            other,
+            normalize=normalize,
+            norm_by=norm_by,
+            chunksize=chunksize
+        )
 
     @utility._method_require(is_empty=False)
-    def intersecting(self, other: Rangel, enforce_edges=True):
+    def intersecting(self, other: Rangel, enforce_edges=True, chunksize=1000):
         """
         Identify intersections between two collections of events.
 
@@ -759,6 +770,10 @@ class Rangel:
             according to each collection's closed state. For instances where 
             these cases are not relevant, set enforce_edges=False for improved 
             performance.
+        chunksize : int or None, default 1000
+            The maximum number of events to process in a single chunk.
+            Input chunksize will affect the memory usage and performance of
+            the function.
         """
         # Validate input events
         if not isinstance(other, self.__class__):
@@ -768,16 +783,16 @@ class Rangel:
         # Select intersection testing routine
         if self.is_point and other.is_point:
             return relate.intersection_point_point(
-                self, other, enforce_edges=enforce_edges)
+                self, other, enforce_edges=enforce_edges, chunksize=chunksize)
         elif self.is_point and other.is_linear:
             return relate.intersection_point_linear(
-                self, other, enforce_edges=enforce_edges)
+                self, other, enforce_edges=enforce_edges, chunksize=chunksize)
         elif self.is_linear and other.is_point:
             return relate.intersection_point_linear(
-                other, self, enforce_edges=enforce_edges).T
+                other, self, enforce_edges=enforce_edges, chunksize=chunksize).T
         elif self.is_linear and other.is_linear:
             return relate.intersection_linear_linear(
-                self, other, enforce_edges=enforce_edges)
+                self, other, enforce_edges=enforce_edges, chunksize=chunksize)
         else:
             raise ValueError("Invalid event types for intersection testing.")
     

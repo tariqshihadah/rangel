@@ -1,7 +1,84 @@
 import numpy as np
 import base
+from scipy import sparse as sp
 
-def overlay(left, right, normalize=True, norm_by='right'):
+def _grouped_operation_wrapper(func):
+    """
+    Decorator for wrapping functions that operate on grouped data.
+    """
+    def wrapper(left, right, *args, **kwargs):
+        # Validate inputs
+        if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
+            raise TypeError("Input objects must be Rangel class instances.")
+        if left.is_grouped != right.is_grouped:
+            raise ValueError("Input objects must have the same grouping status.")
+
+        # Check if grouped
+        if not left.is_grouped:
+            # Return group-less operation
+            return func(left, right, *args, **kwargs)
+        else:
+            # Iterate over groups
+            left_index = []
+            right_index = []
+            res = []
+            for group, left_group in left.iter_groups():
+                right_group = right.select_group(group, inplace=False)
+                # Compute operation on group
+                group_res = func(left_group, right_group, *args, **kwargs)
+                # Convert to sparse array and log
+                res.append(group_res)
+                left_index.append(left_group.index)
+                right_index.append(right_group.index)
+            # Concatenate results
+            res = sp.block_diag(res, format='coo')
+            left_index = np.concatenate(left_index, axis=0)
+            right_index = np.concatenate(right_index, axis=0)
+            # Reorder to match original indices
+            left_select = np.argsort(left_index)[left.index]
+            right_select = np.argsort(right_index)[right.index]
+            res = res.tocsr()[left_select, :][:, right_select]
+            return res
+    return wrapper
+
+def _chunked_operation_wrapper(func):
+    """
+    Decorator for wrapping functions that operate on chunks of data.
+    """
+    def wrapper(left, right, *args, **kwargs):
+        # Validate chunksize
+        chunksize = kwargs.pop('chunksize', None)
+        if chunksize is not None:
+            if not isinstance(chunksize, int):
+                raise TypeError("The 'chunksize' parameter must be an integer.")
+            if chunksize < 1:
+                raise ValueError("The 'chunksize' parameter must be greater than 0.")
+        else:
+            # If no chunksize provided, enforce a single chunk
+            chunksize = max(left.num_events, right.num_events)
+        
+        # Iterate over chunks
+        left_arrays = []
+        for i in range(0, left.num_events, chunksize):
+            right_arrays = []
+            for j in range(0, right.num_events, chunksize):
+                # Get chunk of events
+                left_chunk = left.select_index(slice(i, i + chunksize), ignore=True, inplace=False)
+                right_chunk = right.select_index(slice(j, j + chunksize), ignore=True, inplace=False)
+                # Compute operation on chunk
+                chunk = func(left_chunk, right_chunk, *args, **kwargs)
+                # Convert to sparse array and log
+                right_arrays.append(sp.coo_array(chunk))
+            # Concatenate right arrays and log
+            left_arrays.append(sp.hstack(right_arrays))
+        # Concatenate left arrays and return
+        res = sp.vstack(left_arrays)
+        return res
+    return wrapper
+
+@_grouped_operation_wrapper
+@_chunked_operation_wrapper
+def overlay(left, right, normalize=True, norm_by='right', chunksize=1000):
     """
     Compute the overlay of two collections of events.
 
@@ -17,15 +94,13 @@ def overlay(left, right, normalize=True, norm_by='right'):
         `normalize` is True.
         - 'right' : Normalize by the length of the right events.
         - 'left' : Normalize by the length of the left events.
+    chunksize : int or None, default 1000
+        The maximum number of elements to process in a single chunk.
+        Input chunksize will affect the memory usage and performance of
+        the function.
     """
     _norm_by_options = {'right', 'left'}
     
-    # Validate inputs
-    if not isinstance(left, base.Rangel) or not isinstance(right, base.Rangel):
-        raise TypeError("Input objects must be Rangel class instances.")
-    if left.is_grouped != right.is_grouped:
-        raise ValueError("Input objects must have the same grouping status.")
-
     # Compute overlap lengths
     lefts = left.ends.reshape(-1, 1) - right.begs.reshape(1, -1)
     rights = right.ends.reshape(1, -1) - left.begs.reshape(-1, 1)
@@ -62,7 +137,8 @@ def overlay(left, right, normalize=True, norm_by='right'):
     
     return overlap
 
-def intersection_point_point(left, right):
+@_chunked_operation_wrapper
+def intersection_point_point(left, right, chunksize=1000):
     """
     Identify intersections between two collections of point events.
     """
@@ -87,7 +163,8 @@ def intersection_point_point(left, right):
     
     return res
 
-def intersection_point_linear(left, right, enforce_edges=True):
+@_chunked_operation_wrapper
+def intersection_point_linear(left, right, enforce_edges=True, chunksize=1000):
     """
     Identify intersections between a collection of point events and a collection 
     of linear events.
@@ -136,7 +213,8 @@ def intersection_point_linear(left, right, enforce_edges=True):
     
     return res
 
-def intersection_linear_linear(left, right, enforce_edges=True):
+@_chunked_operation_wrapper
+def intersection_linear_linear(left, right, enforce_edges=True, chunksize=1000):
     """
     Identify intersections between two collections of linear events.
     """
