@@ -41,6 +41,26 @@ def _prepare_data_array(data, name, ndim=1, dtype=None, copy=None):
             )
     return data
 
+def _validate_scalar_or_array_input(rng, value, name, dtype=None, fill=False):
+    """
+    Function for validating input values as a scalar or array-like object with 
+    the same length as the number of events in the input range.
+    """
+    # Validate input
+    if np.isscalar(value):
+        if fill:
+            value = np.full(rng.num_events, value)
+    else:
+        try:
+            value = np.asarray(value, dtype=dtype)
+            assert len(value) == rng.num_events
+        except:
+            raise ValueError(
+                f"Input '{name}' must be a scalar or an array-like with a "
+                "length equal to the number of events in the input collection."
+            )
+    return value
+
 def _stringify_instance(rng):
     # Determine event type
     typologies = []
@@ -50,10 +70,12 @@ def _stringify_instance(rng):
     else:
         if rng.is_located:
             typologies.append('located')
-        typologies.append('linear')
         if rng.is_monotonic:
             typologies.append('monotonic')
-    event_type = ' '.join(typologies)
+        else:
+            typologies.append('non-monotonic')
+        typologies.append('linear')
+    event_type = ', '.join(typologies[:-1]) + ' ' + typologies[-1]
 
     # Set closed string
     closed = f", closed={rng.closed}" if rng.is_linear else ''

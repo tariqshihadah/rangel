@@ -1,5 +1,5 @@
 import numpy as np
-import base
+import base, utility
 
 def dissolve(rng, return_index=False):
     """
@@ -49,3 +49,76 @@ def dissolve(rng, return_index=False):
     if return_index:
         return res, index
     return res
+
+def extend(rng, extend_begs=0, extend_ends=0, inplace=False):
+    """
+    Extend the range of events by a specified amount in either or both directions.
+
+    Parameters
+    ----------
+    rng : Rangel
+        Input range of events.
+    extend_begs : float or array-like, optional
+        Amount to extend the beginning and end of each event range. If an array-like
+        is provided, it must be the same length as the number of events in the 
+        collection. Positive values extend ranges to the left, negative values to
+        the right. Default is 0.
+    extend_ends : float or array-like, optional
+        Amount to extend the end of each event range. If an array-like is provided,
+        it must be the same length as the number of events in the collection. Positive
+        values extend ranges to the right, negative values to the left. Default is 0.
+    inplace : bool, optional
+        If True, modify the input object in place. Default is False.
+    """
+    # Validate input
+    if not isinstance(rng, base.Rangel):
+        raise TypeError("Input object must be a Rangel class instance.")
+    utility._validate_scalar_or_array_input(rng, extend_begs, 'extend_begs')
+    utility._validate_scalar_or_array_input(rng, extend_ends, 'extend_ends')
+
+    # Select object to modify
+    rng = rng if inplace else rng.copy()
+
+    # Select methodology
+    if rng.is_point:
+        rng._begs = rng.locs - extend_begs
+        rng._ends = rng.locs + extend_ends
+    else:
+        rng._begs = rng._begs - extend_begs
+        rng._ends = rng._ends + extend_ends
+    
+    # Return results
+    return None if inplace else rng
+
+def shift(rng, shift, inplace=False):
+    """
+    Shift the range of events by a specified amount.
+
+    Parameters
+    ----------
+    rng : Rangel
+        Input range of events.
+    shift : float or array-like
+        Amount to shift all events. If an array-like is provided, it must
+        be the same length as the number of events in the collection. Positive
+        values shift events to the right, negative values to the left.
+    inplace : bool, optional
+        If True, modify the input object in place. Default is False.
+    """
+    # Validate input
+    if not isinstance(rng, base.Rangel):
+        raise TypeError("Input object must be a Rangel class instance.")
+    utility._validate_scalar_or_array_input(rng, shift, 'shift')
+
+    # Select object to modify
+    rng = rng if inplace else rng.copy()
+
+    # Select methodology
+    if rng.is_located:
+        rng._locs = rng._locs + shift
+    if rng.is_linear:
+        rng._begs = rng._begs + shift
+        rng._ends = rng._ends + shift
+    
+    # Return results
+    return None if inplace else rng

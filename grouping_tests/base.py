@@ -384,6 +384,16 @@ class Rangel:
         rc._index = index
         return None if inplace else rc
     
+    @utility._method_require(is_linear=True)
+    def reset_locs(self, inplace=False):
+        """
+        Reset the locs to None.
+        """
+        # Apply changes
+        rc = self if inplace else self.copy()
+        rc._locs = None
+        return None if inplace else rc
+    
     def select_index(self, index, ignore=False, inplace=False):
         """
         Select events by index or slice. Use ignore=True to use a generic 
@@ -472,9 +482,8 @@ class Rangel:
                 'neither'}, default 'right'
             Whether collection intervals are closed on the left-side, 
             right-side, both or neither.
-        inplace : boolean, default False
-            Whether to perform the operation in place on the parent range
-            collection, returning None.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
         """
         # Check for events type
         if self.is_point and not closed is None:
@@ -508,9 +517,8 @@ class Rangel:
 
         Parameters
         ----------
-        inplace : boolean, default False
-            Whether to perform the operation in place on the parent range
-            collection, returning None.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
         """
         # Sort ranges to enforce monotony
         begs, ends = np.sort(np.stack((self.begs, self.ends), axis=0), axis=0)
@@ -529,12 +537,11 @@ class Rangel:
         by : {self._class_options['keys_all']}
             The event data property or list of properties by which all events 
             should be sorted.
-        ascending : boolean, default True
+        ascending : bool, default True
             Whether sorting should be done in ascending order. When False, 
             events will be sorted in descending order.
-        inplace : boolean, default False
-            Whether to perform the operation in place on the parent range
-            collection, returning None.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
         """
         # Determine sorting parameters
         if not type(by) is list:
@@ -796,3 +803,47 @@ class Rangel:
         else:
             raise ValueError("Invalid event types for intersection testing.")
     
+    def extend(self, extend_begs=0, extend_ends=0, inplace=False):
+        """
+        Extend the range of events by a specified amount in either or both 
+        directions.
+
+        Parameters
+        ----------
+        extend_begs : float or array-like, optional
+            Amount to extend the beginning and end of each event range. If an array-like
+            is provided, it must be the same length as the number of events in the 
+            collection. Positive values extend ranges to the left, negative values to
+            the right. Default is 0.
+        extend_ends : float or array-like, optional
+            Amount to extend the end of each event range. If an array-like is provided,
+            it must be the same length as the number of events in the collection. Positive
+            values extend ranges to the right, negative values to the left. Default is 0.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
+        """
+        return modify.extend(
+            self,
+            extend_begs=extend_begs,
+            extend_ends=extend_ends,
+            inplace=inplace
+        )
+    
+    def shift(self, shift, inplace=False):
+        """
+        Shift the range of events by a specified amount.
+
+        Parameters
+        ----------
+        shift : float or array-like
+            Amount to shift all events. If an array-like is provided, it must
+            be the same length as the number of events in the collection. Positive
+            values shift events to the right, negative values to the left.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
+        """
+        return modify.shift(
+            self,
+            shift=shift,
+            inplace=inplace
+        )
