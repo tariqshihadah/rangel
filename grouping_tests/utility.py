@@ -41,7 +41,7 @@ def _prepare_data_array(data, name, ndim=1, dtype=None, copy=None):
             )
     return data
 
-def _validate_scalar_or_array_input(rng, value, name, dtype=None, fill=False):
+def _validate_scalar_or_array_input(rng, value, name, dtype=None, fill=False, nonzero=False):
     """
     Function for validating input values as a scalar or array-like object with 
     the same length as the number of events in the input range.
@@ -58,6 +58,11 @@ def _validate_scalar_or_array_input(rng, value, name, dtype=None, fill=False):
             raise ValueError(
                 f"Input '{name}' must be a scalar or an array-like with a "
                 "length equal to the number of events in the input collection."
+            )
+    if nonzero:
+        if np.any(value == 0):
+            raise ValueError(
+                f"Input '{name}' must be non-zero."
             )
     return value
 

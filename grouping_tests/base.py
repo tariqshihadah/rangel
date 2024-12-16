@@ -847,3 +847,26 @@ class Rangel:
             shift=shift,
             inplace=inplace
         )
+    
+    def round(self, decimals=None, factor=None, inplace=False):
+        """
+        Round the begin and end positions of the events to a specified number 
+        of decimals or to the nearest multiple of a specified factor.
+
+        Parameters
+        ----------
+        decimals : int, optional
+            Number of decimal places to round to. If not provided, the values 
+            will be rounded to the nearest integer.
+        factor : float, optional
+            Round to the nearest multiple of this factor. If not provided, the 
+            values will be rounded to the nearest integer.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
+        """
+        return modify.round(
+            self,
+            decimals=decimals,
+            factor=factor,
+            inplace=inplace
+        )

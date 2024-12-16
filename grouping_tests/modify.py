@@ -73,8 +73,8 @@ def extend(rng, extend_begs=0, extend_ends=0, inplace=False):
     # Validate input
     if not isinstance(rng, base.Rangel):
         raise TypeError("Input object must be a Rangel class instance.")
-    utility._validate_scalar_or_array_input(rng, extend_begs, 'extend_begs')
-    utility._validate_scalar_or_array_input(rng, extend_ends, 'extend_ends')
+    extend_begs = utility._validate_scalar_or_array_input(rng, extend_begs, 'extend_begs')
+    extend_ends = utility._validate_scalar_or_array_input(rng, extend_ends, 'extend_ends')
 
     # Select object to modify
     rng = rng if inplace else rng.copy()
@@ -108,7 +108,7 @@ def shift(rng, shift, inplace=False):
     # Validate input
     if not isinstance(rng, base.Rangel):
         raise TypeError("Input object must be a Rangel class instance.")
-    utility._validate_scalar_or_array_input(rng, shift, 'shift')
+    shift = utility._validate_scalar_or_array_input(rng, shift, 'shift')
 
     # Select object to modify
     rng = rng if inplace else rng.copy()
@@ -120,5 +120,51 @@ def shift(rng, shift, inplace=False):
         rng._begs = rng._begs + shift
         rng._ends = rng._ends + shift
     
+    # Return results
+    return None if inplace else rng
+
+def round(rng, decimals=None, factor=None, inplace=False):
+    """
+    Round the bounds and locations of events to a specified number of decimal 
+    places or using a specified rounding factor.
+
+    Parameters
+    ----------
+    rng : Rangel
+        Input range of events.
+    decimals : int, optional
+        Number of decimal places to round to. If an array-like is provided, it must
+        be the same length as the number of events in the collection. Default 
+        is None.
+    factor : float, optional
+        Rounding factor. If provided, the bounds and locations of events will be
+        rounded to the nearest multiple of this factor. Default is None.
+    inplace : bool, optional
+        If True, modify the input object in place. Default is False.
+    """
+    # Validate input
+    if not isinstance(rng, base.Rangel):
+        raise TypeError("Input object must be a Rangel class instance.")
+    if decimals is not None:
+        if not isinstance(decimals, int):
+            raise TypeError("'decimals' must be an integer.")
+        _rounder = lambda x: np.round(x, decimals=decimals)
+    elif factor is not None:
+        factor = utility._validate_scalar_or_array_input(rng, factor, 'factor', nonzero=True)
+        _rounder = lambda x: np.round(x / factor, decimals=0) * factor
+    else:
+        raise ValueError("Either 'decimals' or 'factor' must be provided.")
+    
+    # Select object to modify
+    rng = rng if inplace else rng.copy()
+
+    # Select methodology
+    
+    if rng.is_located:
+        rng._locs = _rounder(rng._locs)
+    if rng.is_linear:
+        rng._begs = _rounder(rng._begs)
+        rng._ends = _rounder(rng._ends)
+
     # Return results
     return None if inplace else rng
