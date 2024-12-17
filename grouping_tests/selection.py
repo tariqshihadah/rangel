@@ -38,13 +38,19 @@ def _validate_boolean_selector(rng, selector):
     # Validate input
     try:
         selector = np.asarray(selector)
-        assert selector.ndim == 1
-        assert selector.dtype == bool
-        assert len(selector) == rng.num_events
     except:
         raise ValueError(
-            "Input selector must be a 1D boolean array-like object with the "
-            f"same length as the number of events ({rng.num_events}).")
+            "Input selector must be an array-like object.")
+    if not selector.ndim == 1:
+        raise ValueError(
+            "Input selector must be a 1D array-like object.")
+    if not len(selector) == rng.num_events:
+        raise ValueError(
+            "Input selector must be the same length as the number of events. "
+            f"Expected {rng.num_events}, received {len(selector)}.")
+    if not selector.dtype == bool:
+        raise ValueError(
+            "Input selector must be a boolean array.")
     return selector
 
 def _validate_index_selector(rng, selector, ignore=False):
@@ -54,17 +60,36 @@ def _validate_index_selector(rng, selector, ignore=False):
     # Validate input
     try:
         selector = np.asarray(selector)
-        assert selector.ndim == 1
-        assert len(selector) == rng.num_events
     except:
         raise ValueError(
-            "Input selector must be a 1D array-like object with the "
-            f"same length as the number of events ({rng.num_events}).")
+            "Input selector must be an array-like object.")
+    if not selector.ndim == 1:
+        raise ValueError(
+            "Input selector must be a 1D array-like object.")
+    if ignore and not np.issubdtype(selector.dtype, np.integer):
+        raise ValueError(
+            "When ignoring the set index, input selector must be an array of "
+            "integers.")
+    
     # Apply to index values
     if not ignore:
-        # Apply the index selection
+        # Ensure that all values are present in the index
+        selector_test = np.in1d(selector, rng._index)
+        if not np.all(selector_test):
+            missing_values = selector[~selector_test]
+            raise ValueError(
+                f"Index values not found: {missing_values}")
+        # Sort the event index values
         sorter = np.argsort(rng._index)
+        # Apply the selector to the sorted index values
         selector = np.searchsorted(rng._index[sorter], selector)
+    else:
+        # Ensure that all values are within the range of the number of events
+        selector_test = (selector >= 0) & (selector < rng.num_events)
+        if not np.all(selector_test):
+            missing_values = selector[~selector_test]
+            raise ValueError(
+                f"Index values out of range: {missing_values}")
     return selector
 
 def _apply_selector(rng, selector, inplace=False):
