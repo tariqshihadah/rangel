@@ -4,7 +4,7 @@ import copy, hashlib
 from scipy import sparse as sp
 
 # Import helper modules
-import utility, relate, modify
+import utility, relate, modify, selection
 
 
 class Rangel:
@@ -64,7 +64,7 @@ class Rangel:
         return utility._represent_records(self)
     
     def __getitem__(self, index):
-        return self.select_index(index, ignore=False, inplace=False)
+        return self.select(index, ignore=False, inplace=False)
 
     @property
     def index(self):
@@ -72,6 +72,13 @@ class Rangel:
         Event index.
         """
         return self._index
+    
+    @property
+    def generic_index(self):
+        """
+        Generic 0-based integer index.
+        """
+        return np.arange(self.num_events, dtype=int)
 
     @property
     def groups(self):
@@ -394,37 +401,12 @@ class Rangel:
         rc._locs = None
         return None if inplace else rc
     
-    def select_index(self, index, ignore=False, inplace=False):
+    def select(self, selector, ignore=False, inplace=False):
         """
-        Select events by index or slice. Use ignore=True to use a generic 
-        0-based index, ignoring the current index values.
+        Select events by index, slice, or boolean mask. Use ignore=True to use 
+        a generic, 0-based index, ignoring the current index values.
         """
-        # Validate input index
-        if not isinstance(index, slice):
-            # Enforce array type and check dimension
-            try:
-                index = np.asarray(index)
-                assert index.ndim == 1
-            except:
-                raise ValueError(
-                    "Input index must be a 1D array-like object or a slice object.")
-            # Address the index selection
-            if not ignore:
-                sorter = np.argsort(self._index)
-                index = np.searchsorted(self._index[sorter], index)
-
-        # Apply selection
-        rc = self if inplace else self.copy()
-        try:
-            rc._index = self._index[index]
-            rc._groups = self._groups[index] if self._groups is not None else None
-            rc._locs = self._locs[index] if self._locs is not None else None
-            rc._begs = self._begs[index] if self._begs is not None else None
-            rc._ends = self._ends[index] if self._ends is not None else None
-        except:
-            raise ValueError(
-                "Invalid index selection. Check that the index values are within bounds.")
-        return None if inplace else rc
+        return selection.select(self, selector, ignore=ignore, inplace=inplace)
 
     def select_group(self, group, ungroup=None, inplace=False):
         """
@@ -464,7 +446,7 @@ class Rangel:
 
         # Apply selection
         rc = self if inplace else self.copy()
-        rc = rc.select_index(index, ignore=True, inplace=False)
+        rc = rc.select(index, ignore=True, inplace=False)
 
         # Ungroup selection if necessary
         if ungroup:
@@ -571,7 +553,7 @@ class Rangel:
         
         # Apply changes
         rc = self if inplace else self.copy()
-        rc = rc.select_index(index, ignore=True, inplace=False)
+        rc = rc.select(index, ignore=True, inplace=False)
         return None if inplace else rc
     
     def sort_standard(self, inplace=False):
@@ -693,7 +675,7 @@ class Rangel:
         
         # Iterate over groups
         for group, i, j in zip(unique_groups, splitter_i, splitter_j):
-            rng = sorted_rng.select_index(slice(i, j), inplace=False)
+            rng = sorted_rng.select(slice(i, j), inplace=False)
             # Ungroup if necessary
             if ungroup:
                 rng = rng.ungroup()
