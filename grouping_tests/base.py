@@ -2,6 +2,7 @@ from __future__ import annotations
 import numpy as np
 import copy, hashlib
 from scipy import sparse as sp
+import warnings
 
 # Import helper modules
 import common, utility, relate, modify, selection
@@ -270,8 +271,9 @@ class Rangel:
             index = utility._prepare_data_array(index, 'index')
             # Check that all indices are unique
             if len(np.unique(index)) < len(index):
-                raise ValueError(
-                    "All input indices must be unique.")
+                warnings.warn(
+                    "Input indices are not unique. This may cause unexpected "
+                    "behavior when selecting and modifying events.")
         return index
     
     def _validate_groups(self, groups):
