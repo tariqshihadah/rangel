@@ -422,37 +422,7 @@ class Rangel:
             the result will be ungrouped otherwise the group labels will be
             retained.
         """
-        # Validate input group
-        if not self.is_grouped:
-            raise ValueError("No groups in collection.")
-        if isinstance(group, (list, np.ndarray)):
-            # Multiple group selection
-            select_multiple = True
-            ungroup = False if ungroup is None else ungroup
-            if not all([x in self.unique_groups for x in group]):
-                raise KeyError("Input groups not found in collection.")
-        else:
-            # Single group selection
-            select_multiple = False
-            ungroup = True if ungroup is None else ungroup
-            if not group in self.unique_groups:
-                raise KeyError("Input group not found in collection.")
-        
-        # Identify group indices
-        if select_multiple:
-            index = np.isin(self.groups, group)
-        else:
-            index = np.equal(self.groups, group)
-
-        # Apply selection
-        rc = self if inplace else self.copy()
-        rc = rc.select(index, ignore=True, inplace=False)
-
-        # Ungroup selection if necessary
-        if ungroup:
-            rc._groups = None
-
-        return None if inplace else rc
+        return selection.select_group(self, group, ungroup=ungroup, inplace=inplace)
     
     def set_closed(self, closed=None, inplace=False):
         """

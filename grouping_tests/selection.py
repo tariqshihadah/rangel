@@ -137,3 +137,52 @@ def select_index(rng, index, ignore=False, inplace=False):
     """
     selector = _validate_index_selector(rng, index, ignore)
     return _apply_selector(rng, selector, inplace)
+
+def select_group(rng, group, ungroup=None, inplace=False):
+    """
+    Select events by group.
+
+    Parameters
+    ----------
+    group : label
+        The label of the group to select or array-like of the same.
+    ungroup : bool, default None
+        Whether to ungroup the selection, returning the selected events 
+        without their group labels. If None and a single group is selected,
+        the result will be ungrouped otherwise the group labels will be
+        retained.
+    """
+    # Validate input group
+    if not rng.is_grouped:
+        raise ValueError("No groups in collection.")
+    if isinstance(group, (list, np.ndarray)):
+        # Multiple group selection
+        select_multiple = True
+        ungroup = False if ungroup is None else ungroup
+        # Ensure that all groups are present
+        group_test = np.in1d(group, rng.unique_groups)
+        if not np.all(group_test):
+            missing_groups = group[~group_test]
+            raise KeyError(
+                f"Groups not found in collection: {missing_groups}")
+    else:
+        # Single group selection
+        select_multiple = False
+        ungroup = True if ungroup is None else ungroup
+        if not group in rng.unique_groups:
+            raise KeyError(
+                f"Group not found in collection: {group}")
+    
+    # Identify group indices
+    if select_multiple:
+        index = np.isin(rng.groups, group)
+    else:
+        index = np.equal(rng.groups, group)
+
+    # Apply selection
+    rng = rng if inplace else rng.copy()
+    select_mask(rng, index, inplace=True)
+    if ungroup:
+        rng.ungroup(inplace=True)
+
+    return None if inplace else rng
