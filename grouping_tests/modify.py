@@ -50,6 +50,86 @@ def dissolve(rng, return_index=False):
         return res, index
     return res
 
+def concatenate(rngs, ignore_index=False, closed=None):
+    """
+    Concatenate multiple ranges of events, returning a single collection.
+
+    Parameters
+    ----------
+    rngs : list
+        List of Rangel instances to concatenate.
+    ignore_index : bool, default False
+        Whether to ignore the index values of the input objects, returning a
+        new collection with a new generic 0-based index.
+    closed : str {'left', 'left_mod', 'right', 'right_mod', 'both', 
+            'neither'}, optional
+        Whether collection intervals are closed on the left-side, 
+        right-side, both or neither. If provided, the setting will be applied 
+        to the concatenated results. If not provided, the setting will be 
+        inferred from the first object in the list for linear events.
+    """
+    # Validate input
+    if not isinstance(rngs, list):
+        raise TypeError("Input must be a list of Rangel class instances.")
+    if len(rngs) == 0:
+        raise ValueError("No events to concatenate.")
+    if not all(isinstance(rng, base.Rangel) for rng in rngs):
+        raise TypeError("All input objects must be Rangel class instances.")
+    # Ensure all objects have the same characteristics
+    test_linear = [rng.is_linear for rng in rngs]
+    test_located = [rng.is_located for rng in rngs]
+    test_grouped = [rng.is_grouped for rng in rngs]
+    if not len(set(test_linear)) == 1:
+        raise ValueError(
+            "All input events must have the same structure. Mix of linear and "
+            "non-linear events detected.")
+    if not len(set(test_located)) == 1:
+        raise ValueError(
+            "All input events must have the same structure. Mix of located and "
+            "non-located events detected.")
+    if not len(set(test_grouped)) == 1:
+        raise ValueError(
+            "All input events must have the same structure. Mix of grouped and "
+            "ungrouped events detected.")
+    if (not all(rng.is_linear for rng in rngs)) and closed is not None:
+        raise ValueError(
+            "The 'closed' parameter is only applicable to linear events.")
+    
+    # Identify event structure
+    is_linear = test_linear[0]
+    is_located = test_located[0]
+    is_grouped = test_grouped[0]
+
+    # Concatenate events
+    if is_located:
+        locs = np.concatenate([rng.locs for rng in rngs])
+    else:
+        locs = None
+    if is_linear:
+        begs = np.concatenate([rng.begs for rng in rngs])
+        ends = np.concatenate([rng.ends for rng in rngs])
+    else:
+        begs = None
+        ends = None
+    if is_grouped:
+        groups = np.concatenate([rng.groups for rng in rngs])
+    else:
+        groups = None
+    if ignore_index:
+        index = None
+    else:
+        index = np.concatenate([rng.index for rng in rngs])
+
+    # Return concatenated events
+    return rngs[0].from_similar(
+        index=index,
+        groups=groups,
+        locs=locs,
+        begs=begs,
+        ends=ends,
+        closed=closed if closed is not None else rngs[0].closed
+    )
+
 def extend(rng, extend_begs=0, extend_ends=0, inplace=False):
     """
     Extend the range of events by a specified amount in either or both directions.

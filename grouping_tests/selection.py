@@ -111,8 +111,19 @@ def _apply_selector(rng, selector, inplace=False):
 
 def select(rng, selector, ignore=False, inplace=False):
     """
-    Select events by index or slice. Use ignore=True to use a generic 
-    0-based index, ignoring the current index values.
+    Select events by index, slice, or boolean mask. Use ignore=True to use 
+    a generic, 0-based index, ignoring the current index values.
+
+    Parameters
+    ----------
+    selector : array-like or slice
+        Array-like of event indices, a boolean mask aligned to the events, 
+        or a slice object to select events.
+    ignore : bool, default False
+        Whether to use a generic 0-based index, ignoring the current index 
+        values.
+    inplace : bool, default False
+        Whether to perform the operation in place, returning None.
     """
     selector = _validate_any_selector(rng, selector, ignore)
     return _apply_selector(rng, selector, inplace)
@@ -144,13 +155,15 @@ def select_group(rng, group, ungroup=None, inplace=False):
 
     Parameters
     ----------
-    group : label
+    group : label or array-like
         The label of the group to select or array-like of the same.
     ungroup : bool, default None
         Whether to ungroup the selection, returning the selected events 
         without their group labels. If None and a single group is selected,
         the result will be ungrouped otherwise the group labels will be
         retained.
+    inplace : bool, default False
+        Whether to perform the operation in place, returning None.
     """
     # Validate input group
     if not rng.is_grouped:

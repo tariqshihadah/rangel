@@ -1,5 +1,5 @@
 import numpy as np
-import base
+import common, base
 
 def _method_require(**requirements):
     """
@@ -100,7 +100,7 @@ def _represent_records(rng):
     if rng.num_events == 0:
         return str(rng)
     # Determine number of records to show
-    display_max = rng._class_options['display_max']
+    display_max = common.display_max
     if rng.num_events > display_max:
         # Define head/skip/tail selections
         display_head = (display_max // 2) + (display_max % 2)

@@ -4,23 +4,12 @@ import copy, hashlib
 from scipy import sparse as sp
 
 # Import helper modules
-import utility, relate, modify, selection
+import common, utility, relate, modify, selection
 
 
 class Rangel:
     """
     """
-
-    # Class standard attributes
-    _class_options = dict(
-        display_max = 10,
-        default_closed = 'right',
-        keys_all={'index', 'groups', 'locs', 'begs', 'ends', 'centers'},
-        anchors_all={'locs', 'begs', 'ends', 'centers'},
-        anchors_locs={'begs', 'ends', 'centers'},
-        closed = {'left','left_mod','right','right_mod','both','neither'},
-        closed_base = {'left','right','both','neither'},
-    )
 
     def __init__(
             self, 
@@ -318,9 +307,9 @@ class Rangel:
         elif data_input_case == (True, True, True):
             # If locs are passed as an anchor reference, validate
             if isinstance(locs, str):
-                if not locs in self._class_options['anchors_locs']:
+                if not locs in common.anchors_locs:
                     raise ValueError(
-                        f"Invalid anchor reference for `locs`. Must be one of: {self._class_options['anchors_locs']}."
+                        f"Invalid anchor reference for `locs`. Must be one of: {common.anchors_locs}."
                     )
             # Convert data to numpy arrays
             else:
@@ -405,6 +394,17 @@ class Rangel:
         """
         Select events by index, slice, or boolean mask. Use ignore=True to use 
         a generic, 0-based index, ignoring the current index values.
+
+        Parameters
+        ----------
+        selector : array-like or slice
+            Array-like of event indices, a boolean mask aligned to the events, 
+            or a slice object to select events.
+        ignore : bool, default False
+            Whether to use a generic 0-based index, ignoring the current index 
+            values.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
         """
         return selection.select(self, selector, ignore=ignore, inplace=inplace)
 
@@ -414,13 +414,15 @@ class Rangel:
 
         Parameters
         ----------
-        group : label
+        group : label or array-like
             The label of the group to select or array-like of the same.
         ungroup : bool, default None
             Whether to ungroup the selection, returning the selected events 
             without their group labels. If None and a single group is selected,
             the result will be ungrouped otherwise the group labels will be
             retained.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
         """
         return selection.select_group(self, group, ungroup=ungroup, inplace=inplace)
     
@@ -442,11 +444,11 @@ class Rangel:
             raise ValueError("Point events do not have closed parameters.")
         # Validate input closed parameter
         if closed is None:
-            closed = self._class_options['default_closed']
-        elif not closed in self._class_options['closed']:
+            closed = common.default_closed
+        elif not closed in common.closed:
             raise ValueError(
                 "Collection's closed parameter must be one of "
-                f"{self._class_options['closed']}.")
+                f"{common.closed}.")
         # Apply changes
         rc = self if inplace else self.copy()
         rc._closed = closed
@@ -486,7 +488,7 @@ class Rangel:
         
         Parameters
         ----------
-        by : {self._class_options['keys_all']}
+        by : {common.keys_all}
             The event data property or list of properties by which all events 
             should be sorted.
         ascending : bool, default True
@@ -498,10 +500,10 @@ class Rangel:
         # Determine sorting parameters
         if not type(by) is list:
             by = [by]
-        if not set(by).issubset(self._class_options['keys_all']):
+        if not set(by).issubset(common.keys_all):
             raise ValueError(
                 "Input 'by' parameter must be one or more of "
-                f"{self._class_options['keys_all']}.")
+                f"{common.keys_all}.")
         if self.is_point and ('begs' in by or 'ends' in by):
             raise ValueError(
                 "Sorting by 'begs' or 'ends' is not available for point events.")
