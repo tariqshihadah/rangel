@@ -511,7 +511,7 @@ class Rangel:
         rc._begs, rc._ends = begs, ends
         return None if inplace else rc
 
-    def sort(self, by, ascending=True, inplace=False):
+    def sort(self, by, ascending=True, return_inverse=False, inplace=False):
         f"""
         Sort the events by a selected event data anchor.
         
@@ -523,6 +523,9 @@ class Rangel:
         ascending : bool, default True
             Whether sorting should be done in ascending order. When False, 
             events will be sorted in descending order.
+        return_inverse : bool, default False
+            Whether to return an array of the indices which represent the 
+            inverse of the performed sort in addition to the sorted events.
         inplace : bool, default False
             Whether to perform the operation in place, returning None.
         """
@@ -553,9 +556,10 @@ class Rangel:
         index = np.lexsort(by)
         
         # Apply changes
-        rc = self if inplace else self.copy()
-        rc = rc.select(index, ignore=True, inplace=False)
-        return None if inplace else rc
+        res = self if inplace else self.copy()
+        res = res.select(index, ignore=True, inplace=False)
+        res = res if not return_inverse else (res, index)
+        return None if inplace else res
     
     def sort_standard(self, inplace=False):
         """
