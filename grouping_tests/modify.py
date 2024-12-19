@@ -248,3 +248,107 @@ def round(rng, decimals=None, factor=None, inplace=False):
 
     # Return results
     return None if inplace else rng
+
+def separate(rng, by='centers', inplace=False):
+    """
+    Address overlapping ranges by distributing overlaps between adjacent
+    events. Distributions are made equally and are based on a specified 
+    event anchor point of the location, begin, end, or center of each 
+    event.
+
+    Parameters
+    ----------
+    rng : Rangel
+        Input range of events.
+    by : str {'locs', 'begs', 'ends', 'centers'}, default 'centers'
+        The anchor point of each event to be used when distributing 
+        overlaps between events.
+    inplace : bool, optional
+        If True, modify the input object in place. Default is False.
+    """
+    # Validate input
+    if not isinstance(rng, base.Rangel):
+        raise TypeError("Input object must be a Rangel class instance.")
+    if not rng.is_linear:
+        raise ValueError("Input object must be a linear Rangel instance.")
+    if rng.is_empty:
+        raise ValueError("No events to separate.")
+    if not by in [None, 'locs', 'begs', 'ends', 'centers']:
+        raise ValueError("Separate 'by' must be either 'locs', 'begs', "
+            "'ends', 'centers' or None.")
+
+    # Select object to modify
+    modified = rng if inplace else rng.copy()
+
+    # Prepare sorted events for processing
+    modified, inv = modified.sort(
+        by=[by, 'lengths'],
+        ascending=[True, False],
+        inplace=False,
+        return_inverse=True
+    )
+
+    # Eliminate concentric and same ranges
+    modified.centers == modified.centers
+
+
+
+
+    
+    # Eliminate concentric, same, and inside ranges
+    rc = rc.eliminate_concentric(**kwargs).eliminate_same(**kwargs)
+    if eliminate_inside:
+        rc = rc.eliminate_inside(**kwargs)
+    index = np.where(rc.lengths > 0)[0]
+    
+    #---------------#
+    # MODIFY RANGES #
+    #---------------#
+    # Identify the new begin and end points based on computed
+    # midpoints and existing begin and end points
+    rights    = rc.ends[index[:-1]].copy()
+    lefts     = rc.begs[index[1:]].copy()
+    centers_l = rc.centers[index[:-1]].copy()
+    centers_r = rc.centers[index[1:]].copy()
+    
+    # Compute midpoints between consecutive centers
+    center_mids = (centers_l + centers_r) / 2
+    center_mids_valid = (rights >= center_mids) & (lefts <= center_mids)
+    
+    # Compute midpoints between consecutive termini
+    termini_mids = (rights + lefts)/2
+    termini_mids = np.min([np.max([termini_mids, centers_l], axis=0),
+                            centers_r], axis=0)
+    termini_mids_valid = (
+        (rights >= termini_mids) &
+        (lefts <= termini_mids) &
+        (termini_mids >= centers_l)
+    )
+    
+    # Apply termini mids
+    rights[termini_mids_valid] = termini_mids[termini_mids_valid]
+    lefts[termini_mids_valid]  = termini_mids[termini_mids_valid]
+    
+    # Apply center mids
+    rights[center_mids_valid] = center_mids[center_mids_valid]
+    lefts[center_mids_valid]  = center_mids[center_mids_valid]
+
+    # Assign the new begin and end points to the processed ranges
+    rc.reset_centers(inplace=True)
+    rc._ends[index[:-1]] = rights
+    rc._begs[index[1:]]  = lefts
+    rc = rc[inv]
+
+    if inplace:
+        self._begs = rc._begs
+        self._ends = rc._ends
+        self.reset_centers(inplace=True)
+        # Drop short if requested
+        if drop_short:
+            self.drop_short(length=0, inplace=True)
+        return
+    else:
+        # Drop short if requested
+        if drop_short:
+            rc.drop_short(length=0, inplace=True)
+        return rc

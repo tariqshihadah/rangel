@@ -5,7 +5,7 @@ from scipy import sparse as sp
 import warnings
 
 # Import helper modules
-import common, utility, relate, modify, selection
+import common, utility, relate, modify, selection, analyze
 
 
 class Rangel:
@@ -205,6 +205,19 @@ class Rangel:
         Whether the collection is empty.
         """
         return self.num_events == 0
+    
+    @property
+    def anchors(self):
+        """
+        Get the anchor references for the events.
+        """
+        anchors = []
+        if self.is_located:
+            anchors.append('locs')
+        else:
+            if self.is_linear:
+                anchors.extend(['begs', 'ends'])
+        return anchors
         
     @property
     def modified_edges(self):
@@ -576,6 +589,21 @@ class Rangel:
         
         # Apply sorting
         return self.sort(by, ascending=ascending, inplace=inplace)
+    
+    def duplicated(self, subset=None, keep='first'):
+        """
+        Return a boolean mask of duplicated events in terms of all or a 
+        selection of event anchors.
+
+        Parameters
+        ----------
+        subset : array-like, default None
+            Array-like of event anchors to use for duplicated comparison. If 
+            None, all event anchors are used.
+        keep : {'first', 'last', 'none'}, default 'first'
+            Whether to keep the first, last, or none of the duplicated events.
+        """
+        return analyze.duplicated(self, subset=subset, keep=keep)
             
     def next_overlapping(self, all_=True, when_one=True, enforce_edges=False):
         """
