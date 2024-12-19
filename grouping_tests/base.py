@@ -393,19 +393,6 @@ class Rangel:
         rc._locs = None
         return None if inplace else rc
     
-    def drop(self, mask, inplace=False):
-        """
-        Drop events by boolean mask.
-
-        Parameters
-        ----------
-        mask : array-like
-            Boolean mask aligned to the events.
-        inplace : bool, default False
-            Whether to perform the operation in place, returning None.
-        """
-        return selection.select_mask(self, ~mask, inplace=inplace)
-    
     def select(self, selector, ignore=False, inplace=False):
         """
         Select events by index, slice, or boolean mask. Use ignore=True to use 
@@ -441,6 +428,32 @@ class Rangel:
             Whether to perform the operation in place, returning None.
         """
         return selection.select_group(self, group, ungroup=ungroup, inplace=inplace)
+    
+    def drop(self, mask, inplace=False):
+        """
+        Drop events by boolean mask.
+
+        Parameters
+        ----------
+        mask : array-like
+            Boolean mask aligned to the events.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
+        """
+        return selection.select_mask(self, ~mask, inplace=inplace)
+    
+    def drop_group(self, group, inplace=False):
+        """
+        Drop events by group.
+
+        Parameters
+        ----------
+        group : label or array-like
+            The label of the group to drop or array-like of the same.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
+        """
+        return selection.drop_group(self, group, inplace=inplace)
     
     def set_closed(self, closed=None, inplace=False):
         """

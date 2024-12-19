@@ -92,6 +92,35 @@ def _validate_index_selector(rng, selector, ignore=False):
                 f"Index values out of range: {missing_values}")
     return selector
 
+def _validate_group_selector(rng, group):
+    # Validate input group
+    if not rng.is_grouped:
+        raise ValueError("No groups in collection.")
+    if isinstance(group, (list, np.ndarray)):
+        # Multiple group selection
+        select_multiple = True
+        # Ensure that all groups are present
+        group_test = np.in1d(group, rng.unique_groups)
+        if not np.all(group_test):
+            missing_groups = group[~group_test]
+            raise KeyError(
+                f"Groups not found in collection: {missing_groups}")
+    else:
+        # Single group selection
+        select_multiple = False
+        if not group in rng.unique_groups:
+            raise KeyError(
+                f"Group not found in collection: {group}")
+    
+    # Identify group indices
+    if select_multiple:
+        index = np.isin(rng.groups, group)
+    else:
+        index = np.equal(rng.groups, group)
+
+    # Return results
+    return index
+
 def _apply_selector(rng, selector, inplace=False):
     """
     Apply a selector to the input events.
@@ -197,36 +226,18 @@ def select_group(rng, group, ungroup=None, inplace=False):
     inplace : bool, default False
         Whether to perform the operation in place, returning None.
     """
-    # Validate input group
-    if not rng.is_grouped:
-        raise ValueError("No groups in collection.")
-    if isinstance(group, (list, np.ndarray)):
-        # Multiple group selection
-        select_multiple = True
-        ungroup = False if ungroup is None else ungroup
-        # Ensure that all groups are present
-        group_test = np.in1d(group, rng.unique_groups)
-        if not np.all(group_test):
-            missing_groups = group[~group_test]
-            raise KeyError(
-                f"Groups not found in collection: {missing_groups}")
+    # Validate group input
+    mask = _validate_group_selector(rng, group)
+
+    # Determine ungrouping
+    if ungroup is None:
+        ungroup = not isinstance(group, (list, np.ndarray))
     else:
-        # Single group selection
-        select_multiple = False
-        ungroup = True if ungroup is None else ungroup
-        if not group in rng.unique_groups:
-            raise KeyError(
-                f"Group not found in collection: {group}")
-    
-    # Identify group indices
-    if select_multiple:
-        index = np.isin(rng.groups, group)
-    else:
-        index = np.equal(rng.groups, group)
+        ungroup = bool(ungroup)
 
     # Apply selection
     rng = rng if inplace else rng.copy()
-    select_mask(rng, index, inplace=True)
+    select_mask(rng, mask, inplace=True)
     if ungroup:
         rng.ungroup(inplace=True)
 
@@ -249,3 +260,25 @@ def drop(rng, selector, inplace=False):
     selector = _validate_boolean_selector(rng, selector)
     np.logical_not(selector, out=selector)
     return _apply_selector(rng, selector, inplace=inplace)
+
+def drop_group(rng, group, inplace=False):
+    """
+    Drop events by group.
+    
+    Parameters
+    ----------
+    rng : Rangel
+        The events object to select from.
+    group : label or array-like
+        The label of the group to drop or array-like of the same.
+    inplace : bool, default False
+        Whether to perform the operation in place, returning None.
+    """
+    # Validate group input
+    mask = _validate_group_selector(rng, group)
+
+    # Apply selection
+    rng = rng if inplace else rng.copy()
+    drop(rng, mask, inplace=True)
+
+    return None if inplace else rng
