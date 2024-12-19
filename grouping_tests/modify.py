@@ -288,67 +288,66 @@ def separate(rng, by='centers', inplace=False):
         return_inverse=True
     )
 
-    # Eliminate concentric and same ranges
-    modified.centers == modified.centers
-
-
-
-
-    
-    # Eliminate concentric, same, and inside ranges
-    rc = rc.eliminate_concentric(**kwargs).eliminate_same(**kwargs)
-    if eliminate_inside:
-        rc = rc.eliminate_inside(**kwargs)
-    index = np.where(rc.lengths > 0)[0]
-    
-    #---------------#
-    # MODIFY RANGES #
-    #---------------#
-    # Identify the new begin and end points based on computed
-    # midpoints and existing begin and end points
-    rights    = rc.ends[index[:-1]].copy()
-    lefts     = rc.begs[index[1:]].copy()
-    centers_l = rc.centers[index[:-1]].copy()
-    centers_r = rc.centers[index[1:]].copy()
-    
-    # Compute midpoints between consecutive centers
-    center_mids = (centers_l + centers_r) / 2
-    center_mids_valid = (rights >= center_mids) & (lefts <= center_mids)
-    
-    # Compute midpoints between consecutive termini
-    termini_mids = (rights + lefts)/2
-    termini_mids = np.min([np.max([termini_mids, centers_l], axis=0),
-                            centers_r], axis=0)
-    termini_mids_valid = (
-        (rights >= termini_mids) &
-        (lefts <= termini_mids) &
-        (termini_mids >= centers_l)
-    )
-    
-    # Apply termini mids
-    rights[termini_mids_valid] = termini_mids[termini_mids_valid]
-    lefts[termini_mids_valid]  = termini_mids[termini_mids_valid]
-    
-    # Apply center mids
-    rights[center_mids_valid] = center_mids[center_mids_valid]
-    lefts[center_mids_valid]  = center_mids[center_mids_valid]
-
-    # Assign the new begin and end points to the processed ranges
-    rc.reset_centers(inplace=True)
-    rc._ends[index[:-1]] = rights
-    rc._begs[index[1:]]  = lefts
-    rc = rc[inv]
-
-    if inplace:
-        self._begs = rc._begs
-        self._ends = rc._ends
-        self.reset_centers(inplace=True)
-        # Drop short if requested
-        if drop_short:
-            self.drop_short(length=0, inplace=True)
-        return
-    else:
-        # Drop short if requested
-        if drop_short:
-            rc.drop_short(length=0, inplace=True)
-        return rc
+#    # Eliminate concentric and same ranges
+#
+#
+#
+#
+#    
+#    # Eliminate concentric, same, and inside ranges
+#    rc = rc.eliminate_concentric(**kwargs).eliminate_same(**kwargs)
+#    if eliminate_inside:
+#        rc = rc.eliminate_inside(**kwargs)
+#    index = np.where(rc.lengths > 0)[0]
+#    
+#    #---------------#
+#    # MODIFY RANGES #
+#    #---------------#
+#    # Identify the new begin and end points based on computed
+#    # midpoints and existing begin and end points
+#    rights    = rc.ends[index[:-1]].copy()
+#    lefts     = rc.begs[index[1:]].copy()
+#    centers_l = rc.centers[index[:-1]].copy()
+#    centers_r = rc.centers[index[1:]].copy()
+#    
+#    # Compute midpoints between consecutive centers
+#    center_mids = (centers_l + centers_r) / 2
+#    center_mids_valid = (rights >= center_mids) & (lefts <= center_mids)
+#    
+#    # Compute midpoints between consecutive termini
+#    termini_mids = (rights + lefts)/2
+#    termini_mids = np.min([np.max([termini_mids, centers_l], axis=0),
+#                            centers_r], axis=0)
+#    termini_mids_valid = (
+#        (rights >= termini_mids) &
+#        (lefts <= termini_mids) &
+#        (termini_mids >= centers_l)
+#    )
+#    
+#    # Apply termini mids
+#    rights[termini_mids_valid] = termini_mids[termini_mids_valid]
+#    lefts[termini_mids_valid]  = termini_mids[termini_mids_valid]
+#    
+#    # Apply center mids
+#    rights[center_mids_valid] = center_mids[center_mids_valid]
+#    lefts[center_mids_valid]  = center_mids[center_mids_valid]
+#
+#    # Assign the new begin and end points to the processed ranges
+#    rc.reset_centers(inplace=True)
+#    rc._ends[index[:-1]] = rights
+#    rc._begs[index[1:]]  = lefts
+#    rc = rc[inv]
+#
+#    if inplace:
+#        self._begs = rc._begs
+#        self._ends = rc._ends
+#        self.reset_centers(inplace=True)
+#        # Drop short if requested
+#        if drop_short:
+#            self.drop_short(length=0, inplace=True)
+#        return
+#    else:
+#        # Drop short if requested
+#        if drop_short:
+#            rc.drop_short(length=0, inplace=True)
+#        return rc
