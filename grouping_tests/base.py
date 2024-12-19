@@ -10,6 +10,7 @@ import common, utility, relate, modify, selection
 
 class Rangel:
     """
+    Class for managing collections of events with linear or point data.
     """
 
     def __init__(
@@ -31,21 +32,6 @@ class Rangel:
         # Prepare data
         if force_monotonic and self.is_linear:
             self.set_monotonic(inplace=True)
-
-    def from_similar(self, index=None, groups=None, locs=None, begs=None, ends=None, **kwargs):
-        """
-        Create a new instance of the class with similar properties to the 
-        current instance.
-        """
-        # Populate kwargs
-        kwargs = {
-            'closed': self.closed,
-            'dtype': self._dtype,
-            **kwargs
-        }
-        # Create new instance
-        return self.__class__(
-            index=index, groups=groups, locs=locs, begs=begs, ends=ends, **kwargs)
 
     def __str__(self):
         return utility._stringify_instance(self)
@@ -360,6 +346,21 @@ class Rangel:
         else:
             self.reset_index(inplace=True)
     
+    def from_similar(self, index=None, groups=None, locs=None, begs=None, ends=None, **kwargs):
+        """
+        Create a new instance of the class with similar properties to the 
+        current instance.
+        """
+        # Populate kwargs
+        kwargs = {
+            'closed': self.closed,
+            'dtype': self._dtype,
+            **kwargs
+        }
+        # Create new instance
+        return self.__class__(
+            index=index, groups=groups, locs=locs, begs=begs, ends=ends, **kwargs)
+
     def copy(self, deep=False):
         """
         Create an exact copy of the object instance.
@@ -391,6 +392,19 @@ class Rangel:
         rc = self if inplace else self.copy()
         rc._locs = None
         return None if inplace else rc
+    
+    def drop(self, mask, inplace=False):
+        """
+        Drop events by boolean mask.
+
+        Parameters
+        ----------
+        mask : array-like
+            Boolean mask aligned to the events.
+        inplace : bool, default False
+            Whether to perform the operation in place, returning None.
+        """
+        return selection.select_mask(self, ~mask, inplace=inplace)
     
     def select(self, selector, ignore=False, inplace=False):
         """

@@ -116,6 +116,8 @@ def select(rng, selector, ignore=False, inplace=False):
 
     Parameters
     ----------
+    rng : Rangel
+        The events object to select from.
     selector : array-like or slice
         Array-like of event indices, a boolean mask aligned to the events, 
         or a slice object to select events.
@@ -125,29 +127,59 @@ def select(rng, selector, ignore=False, inplace=False):
     inplace : bool, default False
         Whether to perform the operation in place, returning None.
     """
-    selector = _validate_any_selector(rng, selector, ignore)
-    return _apply_selector(rng, selector, inplace)
+    selector = _validate_any_selector(rng, selector, ignore=ignore)
+    return _apply_selector(rng, selector, inplace=inplace)
 
 def select_slice(rng, slice_, inplace=False):
     """
     Select events by slice.
+
+    Parameters
+    ----------
+    rng : Rangel
+        The events object to select from.
+    slice_ : slice
+        Slice object to select events.
+    inplace : bool, default False
+        Whether to perform the operation in place, returning None.
     """
     selector = _validate_slice_selector(rng, slice_)
-    return _apply_selector(rng, selector, inplace)
+    return _apply_selector(rng, selector, inplace=inplace)
 
 def select_mask(rng, mask, inplace=False):
     """
     Select events by boolean mask.
+
+    Parameters
+    ----------
+    rng : Rangel
+        The events object to select from.
+    mask : array-like
+        Boolean mask aligned to the events.
+    inplace : bool, default False
+        Whether to perform the operation in place, returning None.
     """
     selector = _validate_boolean_selector(rng, mask)
-    return _apply_selector(rng, selector, inplace)
+    return _apply_selector(rng, selector, inplace=inplace)
 
 def select_index(rng, index, ignore=False, inplace=False):
     """
     Select events by index values.
+
+    Parameters
+    ----------
+    rng : Rangel
+        The events object to select from.
+    index : array-like
+        Array-like of event indices to select.
+    ignore : bool, default False
+        Whether to use a generic 0-based index, ignoring the current index 
+        values.
+    inplace : bool, default False
+        Whether to perform the operation in place, returning None.
     """
     selector = _validate_index_selector(rng, index, ignore)
-    return _apply_selector(rng, selector, inplace)
+    return _apply_selector(rng, selector, inplace=inplace)
 
 def select_group(rng, group, ungroup=None, inplace=False):
     """
@@ -199,3 +231,21 @@ def select_group(rng, group, ungroup=None, inplace=False):
         rng.ungroup(inplace=True)
 
     return None if inplace else rng
+
+def drop(rng, selector, inplace=False):
+    """
+    Drop events by boolean mask.
+
+    Parameters
+    ----------
+    rng : Rangel
+        The events object to select from.
+    mask : array-like
+        Boolean mask aligned to the events.
+    inplace : bool, default False
+        Whether to perform the operation in place, returning None.
+    """
+    # Validate boolean mask input and invert
+    selector = _validate_boolean_selector(rng, selector)
+    np.logical_not(selector, out=selector)
+    return _apply_selector(rng, selector, inplace=inplace)
